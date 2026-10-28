@@ -97,7 +97,14 @@ idle → checking → available → downloading → ready
 
 调度：启动 8 秒后第一次查（避开开屏抢网络），之后成功 6 小时、失败 30 分钟重试。检查阶段网络不通就静默跳过，不弹任何东西。
 
-**差量下载**：`electron-builder` 打包时生成的 `.blockmap` 记录了安装包每个块的哈希，`electron-updater` 拿它和本地缓存的上一个安装包比对，只下载变化的块。所以第二次之后的更新通常只有几 MB，而不是完整的 87 MB。代价是：**刚装完的第一版升第二版仍是全量**（本地还没有可比对的旧包）。
+**差量下载**：`electron-builder` 打包时生成的 `.blockmap` 记录了安装包每个块的哈希，`electron-updater` 拿它和旧安装包比对，只下载变化的块。
+
+找旧 blockmap 的顺序是：本地更新缓存 → **旧版本 Release 里那个 `.blockmap` 资源** → 都没有就退回全量。所以：
+
+- **每个 Release 都必须传自己那版的 `.blockmap`**，漏传不会报错，只是那一版升下一版时退化成全量下载。
+- 刚装完的第一版升第二版通常仍是全量——本地还没有可复用的旧安装包。
+
+实测（1.1.9 → 1.2.0）：日志里先打 `Download block maps (old: .../v1.1.9/...blockmap)`，因为那个版本不存在而 404，接着 `Cannot download differentially, fallback to full download`，然后安静地走完整下载，全程不影响界面。这个降级是设计好的，不是故障。
 
 **发新版时**：
 

@@ -404,6 +404,7 @@ function initAutoUpdater() {
 
   autoUpdater.autoDownload = true;          // 有新版就在后台悄悄下
   autoUpdater.autoInstallOnAppQuit = true;  // 用户不点重启，下次退出时也会装上
+  autoUpdater.disableWebInstaller = true;   // 不用 web 安装器，省一次没必要的探测
   autoUpdater.logger = {
     info: (m) => boot('updater ' + m),
     warn: (m) => boot('updater WARN ' + m),
