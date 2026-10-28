@@ -1,18 +1,21 @@
-/* ================= 暖米纸主题 ================= */
+/* ================= 暖米纸 × 舞狮（奶白 / 赭橙 / 藏青） ================= */
 :root {
-  --bg: #FDF6EA;
+  --bg: #FDF7EC;
   --bg-2: #FBF1E2;
-  --fg: #4A3826;
-  --sub: rgba(74, 56, 38, .55);
-  --line: rgba(120, 90, 60, .13);
-  --chip: rgba(120, 90, 60, .07);
-  --inner: rgba(201, 123, 63, .07);
-  --accent: #C97B3F;
-  --accent-2: #E0975C;
-  --accent-soft: rgba(201, 123, 63, .14);
+  --fg: #3F3550;
+  --sub: rgba(63, 53, 80, .55);
+  --line: rgba(92, 72, 112, .13);
+  --chip: rgba(92, 72, 112, .07);
+  --inner: rgba(194, 90, 56, .07);
+  --accent: #C25A38;
+  --accent-2: #E4835A;
+  --accent-soft: rgba(194, 90, 56, .14);
+  --navy: #2C4C96;
+  --navy-soft: rgba(44, 76, 150, .12);
+  --gold: #D9A441;
   --danger: #B5544A;
-  --shadow: 0 16px 38px rgba(120, 90, 60, .22), 0 1px 2px rgba(120, 90, 60, .14);
-  --shadow-hi: 0 22px 48px rgba(120, 90, 60, .26), 0 2px 4px rgba(120, 90, 60, .16);
+  --shadow: 0 16px 38px rgba(110, 78, 58, .22), 0 1px 2px rgba(110, 78, 58, .14);
+  --shadow-hi: 0 22px 48px rgba(110, 78, 58, .26), 0 2px 4px rgba(110, 78, 58, .16);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -95,10 +98,15 @@ html, body {
     transform .3s cubic-bezier(.32, .72, 0, 1);
 }
 
-.island.is-collapsed { --w: 250px; --h: 44px; --r: 22px; }
+.island.is-collapsed { --w: 268px; --h: 44px; --r: 22px; }
 .island.is-alert    { --w: 420px; --h: 68px; --r: 34px; cursor: default; }
 .island.is-open     { --w: 372px; --h: 308px; --r: 28px; cursor: default; box-shadow: var(--shadow-hi); }
-.island.is-open.is-settings { --h: 420px; }
+.island.is-open.is-settings { --h: 468px; }
+
+/* 可拖拽模式：鼠标变成抓手，顶部细线不再显示 */
+.stage.is-free .peek { display: none; }
+.stage.is-free .island.is-collapsed { cursor: grab; }
+.stage.is-free .island.is-collapsed.is-dragging { cursor: grabbing; }
 
 .island:hover { box-shadow: var(--shadow-hi); }
 
@@ -112,7 +120,19 @@ html, body {
 .is-open .layer-open { opacity: 1; pointer-events: auto; transition-delay: .17s; }
 
 /* ---------- 收起态 ---------- */
-.layer-collapsed { display: flex; align-items: center; gap: 9px; padding: 0 14px; }
+.layer-collapsed { display: flex; align-items: center; gap: 9px; padding: 0 14px 0 7px; }
+
+/* 舞狮小女仆头像：比胶囊略高一点，像从里面探出来 */
+.m-ava {
+  width: 33px; height: 35px; flex: none;
+  object-fit: contain; object-position: center bottom;
+  margin: -2px 0 -2px 0;
+  filter: drop-shadow(0 2px 3px rgba(120, 70, 45, .18));
+  animation: bob 3.6s ease-in-out infinite;
+  -webkit-user-drag: none;
+}
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+
 .dot {
   width: 8px; height: 8px; border-radius: 50%; flex: none;
   background: var(--accent);
@@ -139,12 +159,13 @@ html, body {
 }
 
 /* ---------- 提醒态 ---------- */
-.layer-alert { display: flex; align-items: center; gap: 11px; padding: 0 12px 0 14px; }
-.a-emoji {
-  width: 36px; height: 36px; border-radius: 50%; flex: none;
-  display: grid; place-items: center; font-size: 18px;
-  background: var(--accent-soft);
+.layer-alert { display: flex; align-items: center; gap: 11px; padding: 0 12px 0 8px; }
+.a-ava {
+  width: 42px; height: 46px; flex: none;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 5px rgba(120, 70, 45, .2));
   animation: nudge 2.4s ease-in-out infinite;
+  -webkit-user-drag: none;
 }
 @keyframes nudge {
   0%, 88%, 100% { transform: translateX(0); }
@@ -187,6 +208,11 @@ html, body {
 .view.hidden { display: none; }
 
 .head { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+.h-ava {
+  width: 21px; height: 23px; flex: none;
+  object-fit: contain; margin: -3px -1px -3px 0;
+  -webkit-user-drag: none;
+}
 .head .ttl { font-size: 13.5px; font-weight: 650; letter-spacing: .01em; }
 .head .sub { font-size: 10.5px; color: var(--sub); margin-left: auto; }
 .head .sub + .icon-btn { margin-left: 2px; }

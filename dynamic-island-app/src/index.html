@@ -13,7 +13,7 @@
 
     <!-- ============ 收起态 ============ -->
     <div class="layer layer-collapsed">
-      <span class="dot"></span>
+      <img class="m-ava" src="mascot.png" alt="" draggable="false" />
       <span class="c-text" id="cText">暂无待办</span>
       <span class="c-clock mono" id="cClock">45:00</span>
       <span class="u-dot" id="uDot" title="有新版本"></span>
@@ -21,7 +21,7 @@
 
     <!-- ============ 提醒态 ============ -->
     <div class="layer layer-alert">
-      <span class="a-emoji">🚶</span>
+      <img class="a-ava" src="mascot.png" alt="" draggable="false" />
       <span class="a-body">
         <b>坐了 45 分钟啦</b>
         <span>站起来走两步，顺手倒杯水</span>
@@ -38,6 +38,7 @@
       <!-- 待办列表 -->
       <div class="view view-list" id="viewList">
         <div class="head">
+          <img class="h-ava" src="mascot.png" alt="" draggable="false" />
           <span class="ttl" id="listTitle">今天 · 0 件</span>
           <span class="sub" id="listDate">10月27日 周二</span>
           <button class="upd-chip" id="updChip" title="有新版本，点我去下载">v1.1.1 ↑</button>
@@ -94,6 +95,14 @@
           </span>
         </div>
 
+        <div class="set-row">
+          <span class="set-label">位置</span>
+          <span class="presets" id="posModes">
+            <button data-pos="fixed">固定顶部</button>
+            <button data-pos="free">可拖拽</button>
+          </span>
+        </div>
+
         <div class="set-row" id="rowIdle">
           <span class="set-label">停手自动显示</span>
           <span class="idle-ctl">
@@ -113,8 +122,8 @@
           <button class="ver-btn" id="verInfo" title="点击检查更新">v1.1.0</button>
         </div>
 
-        <div class="set-note">离开电脑超过 3 分钟，专注计时会自动清零。</div>
         <div class="set-note">智能：动键鼠就收起，停手到设定分钟数后在当前页面自动出现；把「停手自动显示」关掉就只认顶部细线。也可按 <b>Ctrl+Alt+D</b> 唤出。</div>
+        <div class="set-note">可拖拽：按住空白处拖动，松手记住位置；这时常显，不再自动收起。</div>
 
         <div class="set-foot">
           <button class="btn ghost" id="btnTest">试一下提醒</button>

@@ -25,7 +25,7 @@ app.setPath('userData', process.env.ISLAND_USERDATA || path.join(app.getPath('ap
 boot('userData=' + app.getPath('userData'));
 
 const WIN_W = 440;
-const WIN_H = 430;
+const WIN_H = 500;
 const TOP_OFFSET = 8;      // 岛与屏幕顶部的距离，必须和 style.css 的 .stage padding-top 一致
 
 // 显隐感应参数
@@ -39,7 +39,7 @@ const HIDE_FAST = 400;     // 自动显示出来的岛，用户一动就快速�
 
 let win = null;
 let todos = [];
-let settings = { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 1, autoIdle: true };
+let settings = { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 1, autoIdle: true, draggable: false, winPos: null };
 
 let workSec = 0;          // 本次连续专注秒数
 let alerted = false;      // 是否已经弹过提醒（等用户处理）
@@ -88,10 +88,31 @@ function saveSettings() {
 }
 
 // ---------- 窗口 ----------
+// 把窗口位置夹到屏幕内，保证岛本体不会被拖出可视区
+function clampWinPos(x, y) {
+  const area = screen.getDisplayNearestPoint({
+    x: Math.round(x + WIN_W / 2),
+    y: Math.round(y + WIN_H / 2)
+  }).workArea;
+  const minX = area.x - islandBox.x;
+  const maxX = area.x + area.width - islandBox.x - islandBox.w;
+  const minY = area.y - islandBox.y + 2;
+  const maxY = area.y + area.height - 60;
+  return {
+    x: Math.round(Math.min(Math.max(x, minX), maxX)),
+    y: Math.round(Math.min(Math.max(y, minY), maxY))
+  };
+}
+
 function createWindow() {
   const { workArea } = screen.getPrimaryDisplay();
-  const x = Math.round(workArea.x + (workArea.width - WIN_W) / 2);
-  const y = workArea.y;   // 贴屏幕顶，细线才能落在 y=0
+  const defX = Math.round(workArea.x + (workArea.width - WIN_W) / 2);
+  const defY = workArea.y;   // 贴屏幕顶，细线才能落在 y=0
+  const saved = settings.draggable && settings.winPos
+    ? clampWinPos(settings.winPos.x, settings.winPos.y)
+    : null;
+  const x = saved ? saved.x : defX;
+  const y = saved ? saved.y : defY;
 
   win = new BrowserWindow({
     width: WIN_W,
@@ -167,6 +188,33 @@ function createWindow() {
           console.log('FILE ' + fs.readFileSync(todosFile(), 'utf8').replace(/\s+/g, ' '));
         } catch (e) { console.log('FILE_ERR ' + e.message); }
       } catch (e) { console.log('SELFTEST_ERR ' + e.message); }
+      setTimeout(() => app.quit(), 200);
+    });
+  }
+
+  // 拖拽自检：走完整条 IPC 链，验证窗口真的被移动、位置被记住
+  if (process.env.ISLAND_DRAGTEST) {
+    win.webContents.once('did-finish-load', async () => {
+      await new Promise((r) => setTimeout(r, 1200));
+      const before = win.getPosition();
+      const r = await win.webContents.executeJavaScript(`(async () => {
+        window.islandAPI.dragStart();
+        for (let i = 1; i <= 6; i++) {
+          window.islandAPI.dragMove({ dx: 30 * i, dy: 40 * i });
+          await new Promise(r => setTimeout(r, 20));
+        }
+        window.islandAPI.dragEnd();
+        await new Promise(r => setTimeout(r, 120));
+        return { settings: await window.islandAPI.getState().then(s => s.settings) };
+      })()`);
+      await new Promise((r) => setTimeout(r, 400));
+      const after = win.getPosition();
+      console.log('DRAGTEST ' + JSON.stringify({
+        before, after,
+        dx: after[0] - before[0], dy: after[1] - before[1],
+        saved: r.settings && r.settings.winPos,
+        draggable: r.settings && r.settings.draggable
+      }));
       setTimeout(() => app.quit(), 200);
     });
   }
@@ -247,7 +295,9 @@ function idleSeconds() {
 function idleThreshold() {
   const n = Number(settings.idleMin);
   return (Number.isFinite(n) && n > 0 ? n : AUTO_IDLE_MIN) * 60;
-}function pollPresence() {
+}
+
+function pollPresence() {
   if (!win || win.isDestroyed()) return;
 
   const now = Date.now();
@@ -259,13 +309,14 @@ function idleThreshold() {
   const b = win.getBounds();
   const centerX = b.x + WIN_W / 2;
 
+  const floating = !!settings.draggable;   // 可拖拽：自由摆放，常显，不认顶部细线
   const island = { x: b.x + islandBox.x, y: b.y + islandBox.y, w: islandBox.w, h: islandBox.h };
   const onIsland = inBox(pt, island, 2);
-  const inPeek = pt.y >= b.y - 2 && pt.y <= b.y + PEEK_H && Math.abs(pt.x - centerX) <= PEEK_W / 2;
+  const inPeek = !floating && pt.y >= b.y - 2 && pt.y <= b.y + PEEK_H && Math.abs(pt.x - centerX) <= PEEK_W / 2;
 
-  // 该不该自动出现：常驻 / 钉住 / 智能模式（键鼠停了就在当前页面显现）
+  // 该不该自动出现：可拖拽 / 常驻 / 钉住 / 智能模式（键鼠停了就在当前页面显现）
   let autoShow = false;
-  if (mode === 'always' || keepOpen) {
+  if (floating || mode === 'always' || keepOpen) {
     autoShow = true;
   } else if (mode === 'smart') {
     // autoIdle 关掉后，智能模式就退化成"只认悬停"——停手不再自动弹出
@@ -569,6 +620,43 @@ ipcMain.on('presence:hold', (_e, ms) => {
   pinnedUntil = Date.now() + (Number(ms) || 0);
 });
 
+// ---------- 可拖拽模式 ----------
+// 渲染层只报屏幕位移，主进程按"按下那一刻的窗口位置"平移，避免逐帧累积误差
+let dragOrigin = null;
+
+ipcMain.on('drag:start', () => {
+  if (!win || win.isDestroyed()) return;
+  const [x, y] = win.getPosition();
+  dragOrigin = { x, y };
+});
+
+ipcMain.on('drag:move', (_e, d) => {
+  if (!win || win.isDestroyed() || !dragOrigin || !d) return;
+  const p = clampWinPos(dragOrigin.x + (Number(d.dx) || 0), dragOrigin.y + (Number(d.dy) || 0));
+  win.setPosition(p.x, p.y);
+});
+
+ipcMain.on('drag:end', () => {
+  dragOrigin = null;
+  if (!win || win.isDestroyed()) return;
+  const [x, y] = win.getPosition();
+  settings.winPos = { x, y };
+  saveSettings();
+});
+
+// 切回「固定顶部」：窗口挪回屏幕顶部中央
+ipcMain.on('drag:reset', () => {
+  if (!win || win.isDestroyed()) return;
+  const { workArea } = screen.getPrimaryDisplay();
+  win.setPosition(
+    Math.round(workArea.x + (workArea.width - WIN_W) / 2),
+    workArea.y
+  );
+  settings.winPos = null;
+  saveSettings();
+  setPresence('idle');
+});
+
 ipcMain.handle('state:get', () => ({
   todos, settings, workSec, alerted,
   version: app.getVersion(),
@@ -606,9 +694,11 @@ ipcMain.handle('settings:save', (_e, patch) => {
   saveSettings();
   if (before !== settings.workMinutes) { workSec = 0; alerted = false; }
   if ('autostart' in (patch || {})) applyLogin(!!settings.autostart);
-  if ('presenceMode' in (patch || {})) {
+  if ('presenceMode' in (patch || {}) || 'draggable' in (patch || {})) {
     leaveAt = 0; peekAt = 0; enterAt = 0;
-    setPresence(settings.presenceMode === 'always' ? 'near' : 'idle');
+    // 可拖拽模式常显，直接进入 near，别先缩回细线
+    const showNow = settings.draggable || settings.presenceMode === 'always';
+    setPresence(showNow ? 'near' : 'idle');
   }
   return settings;
 });

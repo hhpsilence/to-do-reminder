@@ -3,13 +3,13 @@ const api = window.islandAPI || createMock();
 
 let state = {
   todos: [],
-  settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 1, autoIdle: true },
+  settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 1, autoIdle: true, draggable: false },
   workSec: 0,
   total: 45 * 60,
   idle: 0,
   active: true,
   alerted: false,
-  version: '1.2.0',
+  version: '1.3.0',
   update: null          // { mode, status, version, percent, error }
 };
 
@@ -148,6 +148,13 @@ function renderSettings() {
   }
   idleInput.disabled = !autoIdle;
   $('rowIdle').classList.toggle('off', mode !== 'smart');
+
+  // 位置：固定顶部 / 可拖拽
+  const free = !!state.settings.draggable;
+  $('posModes').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', (b.dataset.pos === 'free') === free);
+  });
+  stage.classList.toggle('is-free', free);
 }
 
 function renderAll() {
@@ -254,11 +261,67 @@ function addTodo(text) {
 }
 
 /* ---------- 交互绑定 ---------- */
+let suppressClick = false;   // 拖完松手别当成点击
+
 island.addEventListener('click', (e) => {
+  if (suppressClick) { suppressClick = false; return; }
   if (e.target.closest('button') || e.target.closest('input')) return;
   if (e.target.closest('.todo')) return;
   if (ui === 'open') setUI('collapsed');
   else if (ui === 'collapsed') setUI('open');
+});
+
+/* ---------- 可拖拽模式：按住岛任意空白处移动整个窗口 ---------- */
+// 用 screenX/screenY 算位移，主进程按窗口原始位置平移，避免抖动累积
+let drag = null;
+
+function isDragSurface(t) {
+  // 这些地方要留给点击 / 输入，不参与拖动
+  return !t.closest('button, input, .todo, .todos, .add-row, .set-row, .view-settings, .sit');
+}
+
+island.addEventListener('pointerdown', (e) => {
+  if (!state.settings.draggable) return;
+  if (e.button !== 0) return;
+  if (!isDragSurface(e.target)) return;
+  drag = { sx: e.screenX, sy: e.screenY, moved: false, id: e.pointerId };
+  api.dragStart();
+  try { island.setPointerCapture(e.pointerId); } catch (_) {}
+});
+
+island.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const dx = e.screenX - drag.sx;
+  const dy = e.screenY - drag.sy;
+  if (!drag.moved && Math.abs(dx) + Math.abs(dy) > 4) {
+    drag.moved = true;
+    island.classList.add('is-dragging');
+  }
+  if (drag.moved) api.dragMove({ dx, dy });
+});
+
+function endDrag(e) {
+  if (!drag) return;
+  const moved = drag.moved;
+  drag = null;
+  island.classList.remove('is-dragging');
+  try { island.releasePointerCapture(e.pointerId); } catch (_) {}
+  api.dragEnd();
+  if (moved) suppressClick = true;   // 松手紧跟的那次 click 丢掉
+}
+island.addEventListener('pointerup', endDrag);
+island.addEventListener('pointercancel', endDrag);
+
+$('posModes').addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  e.stopPropagation();
+  state.settings.draggable = b.dataset.pos === 'free';
+  renderSettings();
+  stage.classList.remove('is-away');
+  await api.saveSettings({ draggable: state.settings.draggable });
+  // 切回固定时让主进程把窗口挪回顶部中央
+  if (!state.settings.draggable) api.resetPos();
 });
 
 $('btnSettings').addEventListener('click', (e) => { e.stopPropagation(); setView('settings'); });
@@ -496,8 +559,8 @@ api.onTick((data) => {
   if (hash.includes('wake')) { stage.classList.add('is-away', 'is-wake'); }
   if (hash.includes('update') || hash.includes('ready')) {
     state.update = hash.includes('ready')
-      ? { mode: 'auto', status: 'ready', version: '1.3.0', percent: 100 }
-      : { mode: 'auto', status: 'available', version: '1.3.0', percent: 0 };
+      ? { mode: 'auto', status: 'ready', version: '1.4.0', percent: 100 }
+      : { mode: 'auto', status: 'available', version: '1.4.0', percent: 0 };
     renderUpdate();
   }
 })();
@@ -513,7 +576,7 @@ if (api.onUpdate) {
 /* ================= 浏览器内预览用的假接口 ================= */
 function createMock() {
   const KEY = 'island-mock';
-  let data = { todos: [], settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 1, autoIdle: true }, workSec: 1920 };
+  let data = { todos: [], settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 1, autoIdle: true, draggable: false }, workSec: 1920 };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (saved) data = Object.assign(data, saved);
@@ -547,7 +610,7 @@ function createMock() {
       settings: data.settings,
       workSec: data.workSec,
       alerted: false,
-      version: '1.2.0',
+      version: '1.3.0',
       update: null
     }),
     saveTodos: async (list) => { data.todos = list; save(); return list; },
@@ -558,6 +621,10 @@ function createMock() {
     pin: () => {},
     hold: () => {},
     quit: () => {},
+    dragMove: () => {},
+    dragEnd: () => {},
+    resetPos: () => {},
+    dragStart: () => {},
     checkUpdate: async () => ({ ok: true, state: { status: 'idle' } }),
     updateAction: () => {},
     onTick: (cb) => { tickCb = cb; },

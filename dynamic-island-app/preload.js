@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld('islandAPI', {
   pin: (on) => ipcRenderer.send('presence:pin', on),
   hold: (ms) => ipcRenderer.send('presence:hold', ms),
 
+  // 可拖拽模式：拖动时按屏幕位移平移窗口
+  dragStart: () => ipcRenderer.send('drag:start'),
+  dragMove: (d) => ipcRenderer.send('drag:move', d),
+  dragEnd: () => ipcRenderer.send('drag:end'),
+  resetPos: () => ipcRenderer.send('drag:reset'),
+
   onTick: (cb) => ipcRenderer.on('tick', (_e, data) => cb(data)),
   onPresence: (cb) => ipcRenderer.on('presence', (_e, s) => cb(s)),
   onWake: (cb) => ipcRenderer.on('wake', (_e, on) => cb(on)),
