@@ -34,12 +34,12 @@ const PEEK_H = 8;          // 感应带高度
 const PEEK_DELAY = 240;    // 悬停多久才把岛放出来
 const OVER_DELAY = 100;    // 光标进岛多久才接管鼠标（防误触，快速划过不拦截）
 const LEAVE_DELAY = 1200;  // 光标离开多久自动收起
-const AUTO_IDLE_SEC = 15;  // 智能模式：多久没碰键鼠就自动显示
+const AUTO_IDLE_MIN = 1;   // 智能模式：键鼠停多久（分钟）就自动显示
 const HIDE_FAST = 400;     // 自动显示出来的岛，用户一动就快速收回
 
 let win = null;
 let todos = [];
-let settings = { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleSec: 15, autoIdle: true };
+let settings = { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 1, autoIdle: true };
 
 let workSec = 0;          // 本次连续专注秒数
 let alerted = false;      // 是否已经弹过提醒（等用户处理）
@@ -58,10 +58,19 @@ function loadData() {
     settings = Object.assign(settings, JSON.parse(fs.readFileSync(settingsFile(), 'utf8')));
   } catch (_) { /* 首次运行 */ }
   // 旧版本只有 autoHide 开关，迁移成新的三档模式
+  let dirty = false;
   if (!settings.presenceMode) {
     settings.presenceMode = settings.autoHide === false ? 'always' : 'smart';
+    dirty = true;
   }
-  delete settings.autoHide;
+  if ('autoHide' in settings) { delete settings.autoHide; dirty = true; }
+  // 单位从秒改成分钟（1.2.1）：旧的 15 秒按 1 分钟算，不够一分钟也保底 1
+  if (settings.idleMin == null) {
+    settings.idleMin = settings.idleSec ? Math.max(1, Math.round(settings.idleSec / 60)) : AUTO_IDLE_MIN;
+    dirty = true;
+  }
+  if ('idleSec' in settings) { delete settings.idleSec; dirty = true; }
+  if (dirty) saveSettings();   // 迁移结果落盘，别每次启动都算一遍
 }
 
 function saveTodos() {
@@ -234,10 +243,10 @@ function idleSeconds() {
   return idleOverride === null ? powerMonitor.getSystemIdleTime() : idleOverride;
 }
 
-// 智能模式的门槛：键鼠停多久才把岛放出来
+// 智能模式的门槛：键鼠停多久（分钟）才把岛放出来
 function idleThreshold() {
-  const n = Number(settings.idleSec);
-  return Number.isFinite(n) && n > 0 ? n : AUTO_IDLE_SEC;
+  const n = Number(settings.idleMin);
+  return (Number.isFinite(n) && n > 0 ? n : AUTO_IDLE_MIN) * 60;
 }function pollPresence() {
   if (!win || win.isDestroyed()) return;
 
@@ -338,9 +347,9 @@ function runPresenceSelftest() {
   // 第二阶段：智能模式 —— 动电脑收起 / 静默显示 / 回到桌面显示
   const smart = [
     [4000, () => { settings.presenceMode = 'smart'; idleOverride = 0; }, '智能-动电脑'],
-    [5200, () => { idleOverride = 20; }, '智能-静默20秒'],
+    [5200, () => { idleOverride = 120; }, '智能-静默2分钟'],
     [6400, () => { idleOverride = 0; }, '智能-又开始动'],
-    [7600, () => { idleOverride = 20; }, '智能-再次静默'],
+    [7600, () => { idleOverride = 120; }, '智能-再次静默'],
     [8800, () => { idleOverride = 0; }, '智能-再次操作']
   ];
   smart.forEach(([t, fn, name]) => setTimeout(() => {
