@@ -302,6 +302,24 @@ html, body {
 .presets button:hover { background: rgba(120, 90, 60, .12); }
 .presets button.on { background: var(--accent); color: #FFF9F2; border-color: var(--accent); }
 
+/* 「停手自动显示」：秒数输入框 + 开关 */
+.idle-ctl { display: inline-flex; align-items: center; gap: 6px; }
+.num-in {
+  width: 46px; height: 25px;
+  font: inherit; font-size: 11.5px; font-weight: 600;
+  text-align: center; color: var(--fg);
+  border: 1px solid transparent; border-radius: 7px;
+  background: var(--chip); outline: none;
+  user-select: text; -webkit-appearance: none; appearance: none;
+  transition: background .16s ease, border-color .16s ease, opacity .16s ease;
+}
+.num-in::-webkit-inner-spin-button,
+.num-in::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.num-in:hover { background: rgba(120, 90, 60, .12); }
+.num-in:focus { border-color: rgba(201, 123, 63, .45); background: rgba(201, 123, 63, .06); }
+.num-in:disabled { opacity: .45; }
+.idle-ctl .unit { font-size: 11.5px; color: var(--sub); }
+
 .switch {
   width: 40px; height: 23px; border-radius: 999px; flex: none;
   border: 0; cursor: pointer; padding: 2px;

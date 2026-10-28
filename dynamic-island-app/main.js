@@ -39,7 +39,7 @@ const HIDE_FAST = 400;     // 自动显示出来的岛，用户一动就快速�
 
 let win = null;
 let todos = [];
-let settings = { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleSec: 15 };
+let settings = { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleSec: 15, autoIdle: true };
 
 let workSec = 0;          // 本次连续专注秒数
 let alerted = false;      // 是否已经弹过提醒（等用户处理）
@@ -238,9 +238,7 @@ function idleSeconds() {
 function idleThreshold() {
   const n = Number(settings.idleSec);
   return Number.isFinite(n) && n > 0 ? n : AUTO_IDLE_SEC;
-}
-
-function pollPresence() {
+}function pollPresence() {
   if (!win || win.isDestroyed()) return;
 
   const now = Date.now();
@@ -261,7 +259,8 @@ function pollPresence() {
   if (mode === 'always' || keepOpen) {
     autoShow = true;
   } else if (mode === 'smart') {
-    autoShow = idleSeconds() >= idleThreshold();
+    // autoIdle 关掉后，智能模式就退化成"只认悬停"——停手不再自动弹出
+    autoShow = settings.autoIdle !== false && idleSeconds() >= idleThreshold();
   }
 
   if (presence === 'idle') {

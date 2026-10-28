@@ -3,7 +3,7 @@ const api = window.islandAPI || createMock();
 
 let state = {
   todos: [],
-  settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleSec: 15 },
+  settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleSec: 15, autoIdle: true },
   workSec: 0,
   total: 45 * 60,
   idle: 0,
@@ -139,11 +139,14 @@ function renderSettings() {
     b.classList.toggle('on', b.dataset.mode === mode);
   });
 
-  // 停手时长只对智能模式有意义
-  const idle = Number(state.settings.idleSec) || 15;
-  $('idlePresets').querySelectorAll('button').forEach(b => {
-    b.classList.toggle('on', Number(b.dataset.sec) === idle);
-  });
+  // 停手自动显示：只对智能模式有意义
+  const autoIdle = state.settings.autoIdle !== false;
+  $('swIdle').classList.toggle('on', autoIdle);
+  const idleInput = $('idleInput');
+  if (document.activeElement !== idleInput) {
+    idleInput.value = String(Number(state.settings.idleSec) || 15);
+  }
+  idleInput.disabled = !autoIdle;
   $('rowIdle').classList.toggle('off', mode !== 'smart');
 }
 
@@ -335,13 +338,35 @@ $('modes').addEventListener('click', async (e) => {
   await api.saveSettings({ presenceMode: state.settings.presenceMode });
 });
 
-$('idlePresets').addEventListener('click', async (e) => {
-  const b = e.target.closest('button');
-  if (!b) return;
+// 停手秒数：手动填，回车或失焦时落盘；范围 3～600 秒
+const IDLE_MIN = 3, IDLE_MAX = 600;
+function commitIdleSec() {
+  const raw = parseInt($('idleInput').value, 10);
+  const sec = Number.isFinite(raw) ? Math.min(IDLE_MAX, Math.max(IDLE_MIN, raw)) : 15;
+  state.settings.idleSec = sec;
+  $('idleInput').value = String(sec);
+  api.saveSettings({ idleSec: sec });
+}
+
+$('idleInput').addEventListener('click', (e) => e.stopPropagation());
+$('idleInput').addEventListener('focus', (e) => {
+  e.target.select();
+  pinReasons.add('input'); syncPin();
+});
+$('idleInput').addEventListener('blur', () => {
+  commitIdleSec();
+  pinReasons.delete('input'); syncPin();
+});
+$('idleInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.target.blur(); }
+  else if (e.key === 'Escape') { e.target.value = String(Number(state.settings.idleSec) || 15); e.target.blur(); }
+});
+
+$('swIdle').addEventListener('click', async (e) => {
   e.stopPropagation();
-  state.settings.idleSec = Number(b.dataset.sec);
+  state.settings.autoIdle = !(state.settings.autoIdle !== false);
   renderSettings();
-  await api.saveSettings({ idleSec: state.settings.idleSec });
+  await api.saveSettings({ autoIdle: state.settings.autoIdle });
 });
 
 $('btnTest').addEventListener('click', (e) => {
@@ -488,7 +513,7 @@ if (api.onUpdate) {
 /* ================= 浏览器内预览用的假接口 ================= */
 function createMock() {
   const KEY = 'island-mock';
-  let data = { todos: [], settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleSec: 15 }, workSec: 1920 };
+  let data = { todos: [], settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleSec: 15, autoIdle: true }, workSec: 1920 };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (saved) data = Object.assign(data, saved);
