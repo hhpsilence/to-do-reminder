@@ -34,12 +34,12 @@ const PEEK_H = 8;          // 感应带高度
 const PEEK_DELAY = 240;    // 悬停多久才把岛放出来
 const OVER_DELAY = 100;    // 光标进岛多久才接管鼠标（防误触，快速划过不拦截）
 const LEAVE_DELAY = 1200;  // 光标离开多久自动收起
-const AUTO_IDLE_MIN = 1;   // 智能模式：键鼠停多久（分钟）就自动显示
+const AUTO_IDLE_MIN = 5;   // 智能模式：键鼠停多久（分钟）就自动显示
 const HIDE_FAST = 400;     // 自动显示出来的岛，用户一动就快速收回
 
 let win = null;
 let todos = [];
-let settings = { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 1, autoIdle: true, draggable: false, winPos: null };
+let settings = { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 5, autoIdle: true, draggable: false, winPos: null };
 
 let workSec = 0;          // 本次连续专注秒数
 let alerted = false;      // 是否已经弹过提醒（等用户处理）

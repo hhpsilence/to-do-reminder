@@ -3,13 +3,13 @@ const api = window.islandAPI || createMock();
 
 let state = {
   todos: [],
-  settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 1, autoIdle: true, draggable: false },
+  settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 5, autoIdle: true, draggable: false },
   workSec: 0,
   total: 45 * 60,
   idle: 0,
   active: true,
   alerted: false,
-  version: '1.3.1',
+  version: '1.3.2',
   update: null          // { mode, status, version, percent, error }
 };
 
@@ -146,7 +146,7 @@ function renderSettings() {
   $('swIdle').classList.toggle('on', autoIdle);
   const idleInput = $('idleInput');
   if (document.activeElement !== idleInput) {
-    idleInput.value = String(Number(state.settings.idleMin) || 1);
+    idleInput.value = String(Number(state.settings.idleMin) || 5);
   }
   idleInput.disabled = !autoIdle;
   $('rowIdle').classList.toggle('off', mode !== 'smart');
@@ -414,11 +414,11 @@ $('modes').addEventListener('click', async (e) => {
   await api.saveSettings({ presenceMode: state.settings.presenceMode });
 });
 
-// 停手分钟数：手动填，回车或失焦时落盘；范围 1～60 分钟
-const IDLE_MIN = 1, IDLE_MAX = 60;
+// 停手分钟数：手动填，回车或失焦时落盘；范围 1～60 分钟，留空回到默认值
+const IDLE_MIN = 1, IDLE_MAX = 60, IDLE_DEFAULT = 5;
 function commitIdleMin() {
   const raw = parseInt($('idleInput').value, 10);
-  const min = Number.isFinite(raw) ? Math.min(IDLE_MAX, Math.max(IDLE_MIN, raw)) : 1;
+  const min = Number.isFinite(raw) ? Math.min(IDLE_MAX, Math.max(IDLE_MIN, raw)) : IDLE_DEFAULT;
   state.settings.idleMin = min;
   $('idleInput').value = String(min);
   api.saveSettings({ idleMin: min });
@@ -435,7 +435,7 @@ $('idleInput').addEventListener('blur', () => {
 });
 $('idleInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.target.blur(); }
-  else if (e.key === 'Escape') { e.target.value = String(Number(state.settings.idleMin) || 1); e.target.blur(); }
+  else if (e.key === 'Escape') { e.target.value = String(Number(state.settings.idleMin) || 5); e.target.blur(); }
 });
 
 $('swIdle').addEventListener('click', async (e) => {
@@ -590,7 +590,7 @@ if (api.onUpdate) {
 /* ================= 浏览器内预览用的假接口 ================= */
 function createMock() {
   const KEY = 'island-mock';
-  let data = { todos: [], settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 1, autoIdle: true, draggable: false }, workSec: 1920 };
+  let data = { todos: [], settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 5, autoIdle: true, draggable: false }, workSec: 1920 };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (saved) data = Object.assign(data, saved);
@@ -624,7 +624,7 @@ function createMock() {
       settings: data.settings,
       workSec: data.workSec,
       alerted: false,
-      version: '1.3.1',
+      version: '1.3.2',
       update: null
     }),
     saveTodos: async (list) => { data.todos = list; save(); return list; },
