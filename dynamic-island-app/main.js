@@ -35,7 +35,6 @@ const OVER_DELAY = 100;    // 光标进岛多久才接管鼠标（防误触，�
 const LEAVE_DELAY = 1200;  // 光标离开多久自动收起
 const AUTO_IDLE_SEC = 15;  // 智能模式：多久没碰键鼠就自动显示
 const HIDE_FAST = 400;     // 自动显示出来的岛，用户一动就快速收回
-const FG_REFRESH = 600;    // 前台窗口采样间隔
 
 let win = null;
 let todos = [];
@@ -197,46 +196,6 @@ let pinForever = false;      // 输入框聚焦 / 提醒未处理
 let pinnedUntil = 0;         // 快捷键唤出的短暂停留
 let shownBy = 'hover';       // 这次出现是悬停唤出的，还是自动显示的
 
-// ---------- 前台窗口 ----------
-// 用 get-windows 的 N-API 预编译二进制读当前前台窗口，判断用户是不是"回到了桌面"
-let probeActive = null;      // activeWindowSync，加载失败就为 null
-let fg = { app: '', title: '', desktop: false, at: 0 };
-
-async function initForeground() {
-  try {
-    const mod = await import('get-windows');
-    probeActive = mod.activeWindowSync;
-    boot('foreground probe ready');
-  } catch (e) {
-    probeActive = null;
-    boot('foreground probe failed: ' + e.message);
-  }
-}
-
-function isDesktopWindow(w) {
-  if (!w) return true;                                  // 没有前台窗口 ≈ 桌面
-  const app = String((w.owner && w.owner.name) || '').toLowerCase();
-  if (!app.startsWith('explorer')) return false;        // 只认 explorer.exe
-  const title = String(w.title || '').trim();
-  // 桌面是 Program Manager；点任务栏时标题为空。资源管理器文件夹有具体标题，不算
-  return title === '' || /program manager/i.test(title);
-}
-
-function refreshForeground(now) {
-  if (!probeActive || now - fg.at < FG_REFRESH) return;
-  try {
-    const w = probeActive();
-    fg = {
-      app: String((w && w.owner && w.owner.name) || ''),
-      title: String((w && w.title) || ''),
-      desktop: isDesktopWindow(w),
-      at: now
-    };
-  } catch (_) {
-    fg.at = now;   // 读失败就沿用上一次结果，别把状态机带崩
-  }
-}
-
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
@@ -271,7 +230,6 @@ function pollPresence() {
   if (!win || win.isDestroyed()) return;
 
   const now = Date.now();
-  refreshForeground(now);
 
   const mode = settings.presenceMode || 'smart';
   const keepOpen = pinForever || now < pinnedUntil;
@@ -284,13 +242,12 @@ function pollPresence() {
   const onIsland = inBox(pt, island, 2);
   const inPeek = pt.y >= b.y - 2 && pt.y <= b.y + PEEK_H && Math.abs(pt.x - centerX) <= PEEK_W / 2;
 
-  // 该不该自动出现：常驻 / 钉住 / 智能模式（回到桌面 或 静默够久）
+  // 该不该自动出现：常驻 / 钉住 / 智能模式（键鼠停了就在当前页面显现）
   let autoShow = false;
   if (mode === 'always' || keepOpen) {
     autoShow = true;
   } else if (mode === 'smart') {
-    const idle = idleSeconds();
-    autoShow = fg.desktop || idle >= AUTO_IDLE_SEC;
+    autoShow = idleSeconds() >= AUTO_IDLE_SEC;
   }
 
   if (presence === 'idle') {
@@ -343,7 +300,6 @@ function startPresenceLoop() {
 
 // 自检：喂一串假光标位置，验证 idle → near → over → idle 的完整流转
 function runPresenceSelftest() {
-  probeActive = null;                 // 关掉真实前台采样，避免覆盖注入值
   settings.presenceMode = 'hover';    // 第一阶段：悬停模式的基础流转
   const b = win.getBounds();
   const cx = b.x + WIN_W / 2;
@@ -368,11 +324,11 @@ function runPresenceSelftest() {
 
   // 第二阶段：智能模式 —— 动电脑收起 / 静默显示 / 回到桌面显示
   const smart = [
-    [4000, () => { settings.presenceMode = 'smart'; fg.desktop = false; idleOverride = 0; }, '智能-动电脑'],
+    [4000, () => { settings.presenceMode = 'smart'; idleOverride = 0; }, '智能-动电脑'],
     [5200, () => { idleOverride = 20; }, '智能-静默20秒'],
     [6400, () => { idleOverride = 0; }, '智能-又开始动'],
-    [7600, () => { idleOverride = 0; fg.desktop = true; }, '智能-回到桌面'],
-    [8800, () => { fg.desktop = false; }, '智能-打开应用']
+    [7600, () => { idleOverride = 20; }, '智能-再次静默'],
+    [8800, () => { idleOverride = 0; }, '智能-再次操作']
   ];
   smart.forEach(([t, fn, name]) => setTimeout(() => {
     fn();
@@ -490,7 +446,6 @@ if (!gotLock) {
     boot('ready');
     loadData();
     nativeTheme.themeSource = 'light';
-    await initForeground();
     createWindow();
     boot('window created');
     startTicker();
