@@ -39,7 +39,7 @@ const HIDE_FAST = 400;     // 自动显示出来的岛，用户一动就快速�
 
 let win = null;
 let todos = [];
-let settings = { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart' };
+let settings = { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleSec: 15 };
 
 let workSec = 0;          // 本次连续专注秒数
 let alerted = false;      // 是否已经弹过提醒（等用户处理）
@@ -234,6 +234,12 @@ function idleSeconds() {
   return idleOverride === null ? powerMonitor.getSystemIdleTime() : idleOverride;
 }
 
+// 智能模式的门槛：键鼠停多久才把岛放出来
+function idleThreshold() {
+  const n = Number(settings.idleSec);
+  return Number.isFinite(n) && n > 0 ? n : AUTO_IDLE_SEC;
+}
+
 function pollPresence() {
   if (!win || win.isDestroyed()) return;
 
@@ -255,7 +261,7 @@ function pollPresence() {
   if (mode === 'always' || keepOpen) {
     autoShow = true;
   } else if (mode === 'smart') {
-    autoShow = idleSeconds() >= AUTO_IDLE_SEC;
+    autoShow = idleSeconds() >= idleThreshold();
   }
 
   if (presence === 'idle') {
@@ -363,19 +369,82 @@ function applyLogin(enabled) {
   } catch (e) { boot('autostart err ' + e.message); }
 }
 
-// ---------- 版本检查（轻量提示版） ----------
-// 只比对版本号，不下载、不安装。有新版就在岛上亮个点，点开跳浏览器。
-// 比自动更新省心：portable 版同样有效，也不受 GitHub 下载连通性影响。
+// ---------- 版本检查与自动更新 ----------
+// 安装版走 electron-updater：真下载、真安装，支持块级差量（只下变化的块）。
+// 免安装版是把 exe 解压到临时目录运行的，没有可替换的安装位置，自动更新对它无效，
+// 只能退化成"提示 + 跳浏览器"。
 const UPDATE_REPO = 'hhpsilence/to-do-reminder';
 const UPDATE_PAGE = `https://github.com/${UPDATE_REPO}/releases/latest`;
 const CHECK_GAP = 6 * 3600 * 1000;    // 自动检查间隔
 const CHECK_RETRY = 30 * 60 * 1000;   // 检查失败多久后重试
 const CHECK_TIMEOUT = 8000;
 
-let updateInfo = null;   // { version, url, name }，null = 已是最新或还没查到
+const UPDATE_MODE = (app.isPackaged && !isPortable) ? 'auto' : 'manual';
+
+// idle → checking → available → downloading → ready
+// 任一步失败进 error（只在用户已经知道有新版本时才提示）
+let upd = { mode: UPDATE_MODE, status: 'idle', version: '', percent: 0, error: '' };
 let checkedAt = 0;
 let checking = false;
-let lastCheckOk = false; // 上一次检查是否成功（用来区分"已是最新"和"网络失败"）
+let autoUpdater = null;
+
+function pushUpdate(patch) {
+  upd = Object.assign({}, upd, patch);
+  send('update', upd);
+}
+
+// 安装版：把 electron-updater 的事件翻译成 upd 状态
+function initAutoUpdater() {
+  try {
+    ({ autoUpdater } = require('electron-updater'));
+  } catch (e) {
+    boot('updater require failed: ' + e.message);
+    return false;
+  }
+
+  autoUpdater.autoDownload = true;          // 有新版就在后台悄悄下
+  autoUpdater.autoInstallOnAppQuit = true;  // 用户不点重启，下次退出时也会装上
+  autoUpdater.logger = {
+    info: (m) => boot('updater ' + m),
+    warn: (m) => boot('updater WARN ' + m),
+    error: (m) => boot('updater ERR ' + m),
+    debug: () => {}
+  };
+
+  autoUpdater.on('checking-for-update', () => pushUpdate({ status: 'checking', error: '' }));
+
+  autoUpdater.on('update-available', (info) => {
+    boot('updater available ' + info.version);
+    pushUpdate({ status: 'available', version: info.version, percent: 0, error: '' });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    checkedAt = Date.now();
+    pushUpdate({ status: 'idle', version: '', percent: 0, error: '' });
+  });
+
+  autoUpdater.on('download-progress', (p) => {
+    pushUpdate({ status: 'downloading', percent: Math.round((p && p.percent) || 0) });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    boot('updater downloaded ' + info.version);
+    pushUpdate({ status: 'ready', version: info.version, percent: 100, error: '' });
+  });
+
+  autoUpdater.on('error', (e) => {
+    const msg = String((e && e.message) || e);
+    boot('updater error ' + msg);
+    if (upd.status === 'available' || upd.status === 'downloading') {
+      pushUpdate({ status: 'error', error: '下载失败，稍后重试' });
+    } else {
+      // 检查阶段失败就是网络不通，安静跳过，30 分钟后再试
+      pushUpdate({ status: 'idle' });
+    }
+  });
+
+  return true;
+}
 
 // "1.2.10" > "1.2.9"；带 -beta 之类的后缀一律先砍掉
 function cmpVersion(a, b) {
@@ -389,44 +458,48 @@ function cmpVersion(a, b) {
   return 0;
 }
 
+// 免安装版 / 开发态：只查 GitHub Release 的 tag，不下载
+async function checkManual() {
+  const res = await net.fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
+    headers: {
+      'User-Agent': 'DeskIsland/' + app.getVersion(),
+      'Accept': 'application/vnd.github+json'
+    },
+    signal: AbortSignal.timeout(CHECK_TIMEOUT)
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const rel = await res.json();
+  const latest = String(rel.tag_name || rel.name || '').replace(/^v/i, '');
+  boot(`update local=${app.getVersion()} remote=${latest}`);
+  if (cmpVersion(latest, app.getVersion()) > 0) {
+    pushUpdate({ status: 'available', version: latest, percent: 0, error: '' });
+  } else {
+    pushUpdate({ status: 'idle', version: '', percent: 0, error: '' });
+  }
+  checkedAt = Date.now();
+}
+
 async function checkUpdate(force) {
-  if (checking) return updateInfo;
-  if (!force && checkedAt && Date.now() - checkedAt < CHECK_GAP) return updateInfo;
+  if (checking) return upd;
+  if (!force && checkedAt && Date.now() - checkedAt < CHECK_GAP) return upd;
   checking = true;
   try {
-    const mock = process.env.ISLAND_UPDATE_MOCK;   // 调试用：假装有新版
+    const mock = process.env.ISLAND_UPDATE_MOCK;   // 调试用：假装远端有新版
     if (mock) {
-      updateInfo = { version: String(mock).replace(/^v/i, ''), url: UPDATE_PAGE, name: 'v' + mock, mock: true };
+      pushUpdate({ status: 'available', version: String(mock).replace(/^v/i, ''), percent: 0, error: '' });
       checkedAt = Date.now();
-      lastCheckOk = true;
+    } else if (UPDATE_MODE === 'auto' && autoUpdater) {
+      await autoUpdater.checkForUpdates();         // 结果走事件
     } else {
-      // net.fetch 走 Chromium 网络栈，会自动跟随系统代理
-      const res = await net.fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
-        headers: {
-          'User-Agent': 'DeskIsland/' + app.getVersion(),
-          'Accept': 'application/vnd.github+json'
-        },
-        signal: AbortSignal.timeout(CHECK_TIMEOUT)
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const rel = await res.json();
-      const latest = String(rel.tag_name || rel.name || '').replace(/^v/i, '');
-      boot(`update local=${app.getVersion()} remote=${latest}`);
-      updateInfo = cmpVersion(latest, app.getVersion()) > 0
-        ? { version: latest, url: rel.html_url || UPDATE_PAGE, name: rel.name || ('v' + latest) }
-        : null;
-      checkedAt = Date.now();
-      lastCheckOk = true;
+      await checkManual();
     }
   } catch (e) {
-    // 网络不通就安静地算了，不弹任何提示，30 分钟后再试
-    lastCheckOk = false;
-    boot('update check failed: ' + (e && e.message || e));
+    boot('update check failed: ' + ((e && e.message) || e));
+    if (upd.status === 'checking') pushUpdate({ status: 'idle' });
   } finally {
     checking = false;
   }
-  send('update', updateInfo);
-  return updateInfo;
+  return upd;
 }
 
 // 自己排下一次：成功过就 6 小时，失败过就 30 分钟
@@ -490,18 +563,25 @@ ipcMain.on('presence:hold', (_e, ms) => {
 ipcMain.handle('state:get', () => ({
   todos, settings, workSec, alerted,
   version: app.getVersion(),
-  update: updateInfo
+  update: upd
 }));
 
 // 手动检查（设置页点版本号），绕过节流
 ipcMain.handle('update:check', async () => {
-  const info = await checkUpdate(true);
-  return { ok: lastCheckOk, info };
+  await checkUpdate(true);
+  return { ok: upd.status !== 'error', state: upd };
 });
 
-// 有新版本时打开 Release 页面，让用户自己挑 setup / portable
-ipcMain.on('update:open', () => {
-  const url = (updateInfo && updateInfo.url) || UPDATE_PAGE;
+// 点岛上的提示：下好了就重启安装，否则打开 Release 页面
+ipcMain.on('update:act', () => {
+  if (upd.status === 'ready' && autoUpdater) {
+    boot('updater quitAndInstall');
+    setImmediate(() => autoUpdater.quitAndInstall(false, true));
+    return;
+  }
+  const url = upd.version
+    ? `https://github.com/${UPDATE_REPO}/releases/tag/v${upd.version}`
+    : UPDATE_PAGE;
   shell.openExternal(url).catch((e) => boot('openExternal failed: ' + e.message));
 });
 
@@ -564,6 +644,10 @@ if (!gotLock) {
     } catch (e) { boot('hotkey err ' + e.message); }
 
     if (process.env.ISLAND_SELFTEST_PRESENCE) runPresenceSelftest();
+
+    // 安装版才有真正的自动更新；免安装版只做版本提示
+    if (UPDATE_MODE === 'auto') initAutoUpdater();
+    boot('update mode=' + UPDATE_MODE + ' version=' + app.getVersion());
 
     // 启动 8 秒后再查版本，别跟开屏抢网络；调试模式提前到 0.5 秒
     scheduleUpdateCheck(process.env.ISLAND_UPDATE_MOCK ? 500 : 8000);

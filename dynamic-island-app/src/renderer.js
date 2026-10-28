@@ -3,14 +3,14 @@ const api = window.islandAPI || createMock();
 
 let state = {
   todos: [],
-  settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart' },
+  settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleSec: 15 },
   workSec: 0,
   total: 45 * 60,
   idle: 0,
   active: true,
   alerted: false,
-  version: '1.1.0',
-  update: null          // { version, url } —— 有值就说明有新版本
+  version: '1.2.0',
+  update: null          // { mode, status, version, percent, error }
 };
 
 let ui = 'collapsed';     // collapsed | alert | open
@@ -138,6 +138,13 @@ function renderSettings() {
   $('modes').querySelectorAll('button').forEach(b => {
     b.classList.toggle('on', b.dataset.mode === mode);
   });
+
+  // 停手时长只对智能模式有意义
+  const idle = Number(state.settings.idleSec) || 15;
+  $('idlePresets').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', Number(b.dataset.sec) === idle);
+  });
+  $('rowIdle').classList.toggle('off', mode !== 'smart');
 }
 
 function renderAll() {
@@ -149,18 +156,29 @@ function renderAll() {
 }
 
 /* ---------- 版本提示 ---------- */
+// status: idle | checking | available | downloading | ready | error
 function renderUpdate() {
-  const u = state.update;
-  $('uDot').classList.toggle('show', !!u);
-  $('updChip').classList.toggle('show', !!u);
-  if (u) $('updChip').textContent = 'v' + u.version + ' ↑';
+  const u = state.update || {};
+  const st = u.status || 'idle';
+  const show = st === 'available' || st === 'downloading' || st === 'ready';
+
+  $('uDot').classList.toggle('show', show);
+
+  const chip = $('updChip');
+  chip.classList.toggle('show', show);
+  if (st === 'available') chip.textContent = 'v' + u.version + ' ↑';
+  else if (st === 'downloading') chip.textContent = (u.percent || 0) + '%';
+  else if (st === 'ready') chip.textContent = '重启更新';
 
   const v = $('verInfo');
-  v.classList.toggle('has-new', !!u);
-  v.textContent = u
-    ? `v${state.version} → v${u.version}`
-    : `v${state.version}`;
-  v.title = u ? '有新版本，点击打开下载页' : '点击检查更新';
+  v.classList.toggle('has-new', show);
+  if (st === 'ready') v.textContent = `v${u.version} 已就绪 · 点此重启`;
+  else if (show) v.textContent = `v${state.version} → v${u.version}`;
+  else v.textContent = `v${state.version}`;
+
+  v.title = st === 'ready' ? '重启并安装新版本'
+    : show ? (u.mode === 'auto' ? '正在后台下载，点此查看' : '有新版本，点击打开下载页')
+    : '点击检查更新';
 }
 
 /* ---------- 状态切换 ---------- */
@@ -317,6 +335,15 @@ $('modes').addEventListener('click', async (e) => {
   await api.saveSettings({ presenceMode: state.settings.presenceMode });
 });
 
+$('idlePresets').addEventListener('click', async (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  e.stopPropagation();
+  state.settings.idleSec = Number(b.dataset.sec);
+  renderSettings();
+  await api.saveSettings({ idleSec: state.settings.idleSec });
+});
+
 $('btnTest').addEventListener('click', (e) => {
   e.stopPropagation();
   preview = true;
@@ -324,15 +351,19 @@ $('btnTest').addEventListener('click', (e) => {
   chime();
 });
 
-// 有新版本 → 直接开浏览器；没有 → 手动查一次
+// 有新版 → 下好了就重启安装，没下好就开浏览器；已是最新 → 手动查一次
 $('updChip').addEventListener('click', (e) => {
   e.stopPropagation();
-  api.openUpdate();
+  api.updateAction();
 });
 
 $('verInfo').addEventListener('click', async (e) => {
   e.stopPropagation();
-  if (state.update) { api.openUpdate(); return; }
+  const st = (state.update && state.update.status) || 'idle';
+  if (st === 'available' || st === 'downloading' || st === 'ready') {
+    api.updateAction();
+    return;
+  }
   const el = $('verInfo');
   const back = () => setTimeout(renderUpdate, 2200);
   el.textContent = '检查中…';
@@ -343,9 +374,9 @@ $('verInfo').addEventListener('click', async (e) => {
     back();
     return;
   }
-  state.update = r.info || null;
+  state.update = r.state || null;
   renderUpdate();
-  if (!state.update) {
+  if (!state.update || state.update.status === 'idle') {
     el.textContent = `v${state.version} · 已是最新`;
     back();
   }
@@ -438,8 +469,10 @@ api.onTick((data) => {
   if (hash.includes('alert')) { preview = true; setUI('alert'); }
   if (hash.includes('away')) { stage.classList.add('is-away'); }
   if (hash.includes('wake')) { stage.classList.add('is-away', 'is-wake'); }
-  if (hash.includes('update')) {
-    state.update = { version: '1.2.0', url: 'https://github.com/hhpsilence/to-do-reminder/releases/latest' };
+  if (hash.includes('update') || hash.includes('ready')) {
+    state.update = hash.includes('ready')
+      ? { mode: 'auto', status: 'ready', version: '1.3.0', percent: 100 }
+      : { mode: 'auto', status: 'available', version: '1.3.0', percent: 0 };
     renderUpdate();
   }
 })();
@@ -455,7 +488,7 @@ if (api.onUpdate) {
 /* ================= 浏览器内预览用的假接口 ================= */
 function createMock() {
   const KEY = 'island-mock';
-  let data = { todos: [], settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart' }, workSec: 1920 };
+  let data = { todos: [], settings: { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleSec: 15 }, workSec: 1920 };
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
     if (saved) data = Object.assign(data, saved);
@@ -489,7 +522,7 @@ function createMock() {
       settings: data.settings,
       workSec: data.workSec,
       alerted: false,
-      version: '1.1.0',
+      version: '1.2.0',
       update: null
     }),
     saveTodos: async (list) => { data.todos = list; save(); return list; },
@@ -500,8 +533,8 @@ function createMock() {
     pin: () => {},
     hold: () => {},
     quit: () => {},
-    checkUpdate: async () => ({ ok: true, info: null }),
-    openUpdate: () => {},
+    checkUpdate: async () => ({ ok: true, state: { status: 'idle' } }),
+    updateAction: () => {},
     onTick: (cb) => { tickCb = cb; },
     onPresence: () => {},
     onWake: () => {},

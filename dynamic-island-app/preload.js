@@ -18,8 +18,8 @@ contextBridge.exposeInMainWorld('islandAPI', {
   onWake: (cb) => ipcRenderer.on('wake', (_e, on) => cb(on)),
   onSummon: (cb) => ipcRenderer.on('summon', () => cb()),
 
-  // 版本检查
+  // 版本检查与更新
   checkUpdate: () => ipcRenderer.invoke('update:check'),
-  openUpdate: () => ipcRenderer.send('update:open'),
+  updateAction: () => ipcRenderer.send('update:act'),
   onUpdate: (cb) => ipcRenderer.on('update', (_e, info) => cb(info))
 });

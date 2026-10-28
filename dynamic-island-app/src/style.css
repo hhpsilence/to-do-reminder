@@ -98,7 +98,7 @@ html, body {
 .island.is-collapsed { --w: 250px; --h: 44px; --r: 22px; }
 .island.is-alert    { --w: 420px; --h: 68px; --r: 34px; cursor: default; }
 .island.is-open     { --w: 372px; --h: 308px; --r: 28px; cursor: default; box-shadow: var(--shadow-hi); }
-.island.is-open.is-settings { --h: 398px; }
+.island.is-open.is-settings { --h: 420px; }
 
 .island:hover { box-shadow: var(--shadow-hi); }
 
@@ -287,8 +287,10 @@ html, body {
 /* 设置 */
 .set-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 2px; border-bottom: 1px solid var(--line);
+  padding: 7px 2px; border-bottom: 1px solid var(--line);
 }
+/* 悬停/常驻模式下"停手多久显示"这一行没用，淡掉 */
+.set-row.off { opacity: .38; pointer-events: none; }
 .set-label { font-size: 12.5px; }
 .presets { display: inline-flex; gap: 4px; }
 .presets button {
@@ -315,8 +317,13 @@ html, body {
 .switch.on { background: var(--accent); }
 .switch.on i { transform: translateX(17px); }
 
-.set-note { font-size: 10.5px; color: var(--sub); line-height: 1.6; padding: 10px 2px 0; }
-.set-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding-top: 10px; }
+.set-note { font-size: 10.5px; color: var(--sub); line-height: 1.6; padding: 7px 2px 0; }
+.set-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding-top: 8px; }
+
+/* 设置项多了以后兜底：内容超高就滚动，别把底部按钮顶出去 */
+.view-settings { overflow-y: auto; overflow-x: hidden; }
+.view-settings::-webkit-scrollbar { width: 4px; }
+.view-settings::-webkit-scrollbar-thumb { background: rgba(120, 90, 60, .18); border-radius: 4px; }
 
 /* 设置页的版本按钮 */
 .ver-btn {
