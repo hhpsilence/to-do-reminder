@@ -69,6 +69,20 @@ Windows 顶部居中的小胶囊：记待办、看清单、连续工作到点提
 
 删掉这两个文件即恢复默认。
 
+## 版本检查
+
+只做提示，不下载、不安装：
+
+1. 启动 8 秒后（避开开屏抢网络）请求 `https://api.github.com/repos/hhpsilence/to-do-reminder/releases/latest`，比对 `tag_name` 和 `app.getVersion()`。
+2. 有新版时，收起态的胶囊右侧亮一个小圆点，展开后列表头出现 `v1.2.0 ↑` 胶囊，设置页「版本」一行显示 `v1.1.0 → v1.2.0`。
+3. 点胶囊或版本号 → 用系统浏览器打开 Release 页面，自己挑 setup 还是 portable。
+
+之后每 6 小时查一次；失败就静默重试（30 分钟后），不打扰人。手动点设置页的版本号可以立刻查一次，并区分「已是最新」和「检查失败」。
+
+为什么不做 electron-updater 那套自动更新：安装包 87 MB，而 portable 版运行时解压到临时目录、没有可替换的安装位置，自动更新对它完全无效；差分下载又要求本地缓存着上一版安装包，实际只有「装过两版以上的 setup 版用户」才吃得到收益。加上 GitHub Releases 在国内直连不稳，为省几十 MB 引入一整套更新链和它的坑，不划算。
+
+**发新版时**：把 `package.json` 的 `version` 改掉 → 重新打包 → 在 GitHub 发一个 tag 更高的 Release（`v1.2.0`）并上传 exe。老用户下次启动就会看到小圆点。注意 tag 必须能被 `parseInt` 解析成数字（`v1.2.0` 可以，`v1.2.0-beta` 会被当成 `1.2.0`）。
+
 ## 开发
 
 ```bash
@@ -94,10 +108,21 @@ set ISLAND_SELFTEST_PRESENCE=1 && npx electron .
 set ISLAND_SHOT=C:\temp && npx electron .
 ```
 
+调试用的环境变量：
+
+| 变量 | 作用 |
+|---|---|
+| `ISLAND_UPDATE_MOCK=1.2.0` | 假装远端有 1.2.0，用来看新版本提示长什么样（不发网络请求） |
+| `ISLAND_USERDATA=C:\temp\x` | 换一份数据目录，自检或想同时开两份时用，不动日常数据 |
+
+页面本身支持用 hash 预览各种状态，浏览器直接打开 `src/index.html` 也能看（走内置 mock 数据）：
+
+`#open`、`#settings`、`#alert`、`#away`、`#wake`、`#update`，可以用逗号叠加，例如 `index.html#settings,update`。
+
 ## 结构
 
 ```
-main.js            主进程：窗口、置顶、显隐状态机、计时、存储、IPC
+main.js            主进程：窗口、置顶、显隐状态机、计时、存储、版本检查、IPC
 preload.js         暴露给页面的安全接口
 src/index.html     胶囊结构（细线 / 收起 / 提醒 / 展开 / 设置）
 src/style.css      暖米纸主题 + 顶部细线
@@ -138,5 +163,6 @@ const isPortable = !!PORTABLE_EXE;
 
 - 安装包和免安装版都没有做代码签名，首次运行 Windows 可能弹 SmartScreen「已保护你的电脑」，点「更多信息 → 仍要运行」即可。
 - 开机自启注册在 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 的 `electron.app.DeskIsland`，记录的是「当前正在运行的 exe 路径」，换位置后重新打开一次应用会自动修正。
-- **安装版和免安装版共用同一份数据（`%APPDATA%\desk-island`）和同一个自启项**，所以别同时开两个——单实例锁会让后启动的那个直接退出。想彻底分开，把 `main.js` 里 `app.setPath('userData', ...)` 的目录名改掉再各自打包。
+- **安装版和免安装版共用同一份数据（`%APPDATA%\desk-island`）和同一个自启项**，所以别同时开两个——单实例锁会让后启动的那个直接退出。想同时跑两份，用 `ISLAND_USERDATA` 指到另一个目录（注意自启项仍只有一份）。
 - 免安装版每次启动都要解压，冷启动比安装版慢；任务栏、开始菜单里不会有快捷方式，需要的话自己右键 exe 发送到桌面。
+- 版本检查走 `api.github.com`。如果所在网络访问不了 GitHub，它只会安静地失败（启动日志里有一行 `update check failed`），不会弹任何提示，也不影响其他功能。

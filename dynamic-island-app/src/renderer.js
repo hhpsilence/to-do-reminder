@@ -8,7 +8,9 @@ let state = {
   total: 45 * 60,
   idle: 0,
   active: true,
-  alerted: false
+  alerted: false,
+  version: '1.1.0',
+  update: null          // { version, url } —— 有值就说明有新版本
 };
 
 let ui = 'collapsed';     // collapsed | alert | open
@@ -143,6 +145,22 @@ function renderAll() {
   renderTodos();
   renderSit();
   renderSettings();
+  renderUpdate();
+}
+
+/* ---------- 版本提示 ---------- */
+function renderUpdate() {
+  const u = state.update;
+  $('uDot').classList.toggle('show', !!u);
+  $('updChip').classList.toggle('show', !!u);
+  if (u) $('updChip').textContent = 'v' + u.version + ' ↑';
+
+  const v = $('verInfo');
+  v.classList.toggle('has-new', !!u);
+  v.textContent = u
+    ? `v${state.version} → v${u.version}`
+    : `v${state.version}`;
+  v.title = u ? '有新版本，点击打开下载页' : '点击检查更新';
 }
 
 /* ---------- 状态切换 ---------- */
@@ -306,6 +324,33 @@ $('btnTest').addEventListener('click', (e) => {
   chime();
 });
 
+// 有新版本 → 直接开浏览器；没有 → 手动查一次
+$('updChip').addEventListener('click', (e) => {
+  e.stopPropagation();
+  api.openUpdate();
+});
+
+$('verInfo').addEventListener('click', async (e) => {
+  e.stopPropagation();
+  if (state.update) { api.openUpdate(); return; }
+  const el = $('verInfo');
+  const back = () => setTimeout(renderUpdate, 2200);
+  el.textContent = '检查中…';
+  let r = null;
+  try { r = await api.checkUpdate(); } catch (_) { r = null; }
+  if (!r || !r.ok) {
+    el.textContent = '检查失败，稍后再试';
+    back();
+    return;
+  }
+  state.update = r.info || null;
+  renderUpdate();
+  if (!state.update) {
+    el.textContent = `v${state.version} · 已是最新`;
+    back();
+  }
+});
+
 $('btnQuit').addEventListener('click', (e) => {
   e.stopPropagation();
   api.quit();
@@ -376,6 +421,8 @@ api.onTick((data) => {
     state.workSec = s.workSec || 0;
     state.total = (state.settings.workMinutes || 45) * 60;
     state.alerted = !!s.alerted;
+    state.version = s.version || state.version;
+    state.update = s.update || null;
   }
   renderAll();
   setUI('collapsed');
@@ -383,15 +430,27 @@ api.onTick((data) => {
   setTimeout(reportRect, 300);
   window.addEventListener('resize', reportRect);
 
-  // 供设计预览 / 截图用
-  const hash = location.hash.replace('#', '');
-  if (hash) stage.classList.remove('is-away');
-  if (hash === 'open') setUI('open');
-  if (hash === 'settings') { setUI('open'); setView('settings'); }
-  if (hash === 'alert') { preview = true; setUI('alert'); }
-  if (hash === 'away') { stage.classList.add('is-away'); }
-  if (hash === 'wake') { stage.classList.add('is-away', 'is-wake'); }
+  // 供设计预览 / 截图用，支持逗号叠加：#open,update
+  const hash = location.hash.replace('#', '').split(',').filter(Boolean);
+  if (hash.length) stage.classList.remove('is-away');
+  if (hash.includes('open')) setUI('open');
+  if (hash.includes('settings')) { setUI('open'); setView('settings'); }
+  if (hash.includes('alert')) { preview = true; setUI('alert'); }
+  if (hash.includes('away')) { stage.classList.add('is-away'); }
+  if (hash.includes('wake')) { stage.classList.add('is-away', 'is-wake'); }
+  if (hash.includes('update')) {
+    state.update = { version: '1.2.0', url: 'https://github.com/hhpsilence/to-do-reminder/releases/latest' };
+    renderUpdate();
+  }
 })();
+
+// 主进程查到新版本会推过来
+if (api.onUpdate) {
+  api.onUpdate((info) => {
+    state.update = info || null;
+    renderUpdate();
+  });
+}
 
 /* ================= 浏览器内预览用的假接口 ================= */
 function createMock() {
@@ -429,7 +488,9 @@ function createMock() {
       todos: data.todos,
       settings: data.settings,
       workSec: data.workSec,
-      alerted: false
+      alerted: false,
+      version: '1.1.0',
+      update: null
     }),
     saveTodos: async (list) => { data.todos = list; save(); return list; },
     saveSettings: async (patch) => { Object.assign(data.settings, patch); save(); return data.settings; },
@@ -439,9 +500,12 @@ function createMock() {
     pin: () => {},
     hold: () => {},
     quit: () => {},
+    checkUpdate: async () => ({ ok: true, info: null }),
+    openUpdate: () => {},
     onTick: (cb) => { tickCb = cb; },
     onPresence: () => {},
     onWake: () => {},
-    onSummon: () => {}
+    onSummon: () => {},
+    onUpdate: () => {}
   };
 }

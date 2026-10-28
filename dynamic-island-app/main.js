@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, screen, powerMonitor, nativeTheme, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, powerMonitor, nativeTheme, globalShortcut, shell, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -20,7 +20,8 @@ boot(`--- start packaged=${app.isPackaged} portable=${isPortable} exec=${process
 if (isPortable) boot('portable exe=' + PORTABLE_EXE);
 
 // 开发模式与打包后共用同一份数据目录（否则打包后待办会"消失"）
-app.setPath('userData', path.join(app.getPath('appData'), 'desk-island'));
+// ISLAND_USERDATA 可以指到别处：自检 / 同时开两份时用，不影响日常数据
+app.setPath('userData', process.env.ISLAND_USERDATA || path.join(app.getPath('appData'), 'desk-island'));
 boot('userData=' + app.getPath('userData'));
 
 const WIN_W = 440;
@@ -138,12 +139,19 @@ function createWindow() {
         await new Promise((r) => setTimeout(r, 600));
       }
       try {
+        // 设了 ISLAND_UPDATE_MOCK 时顺便走一遍 IPC，验证手动检查的返回值
+        const chk = process.env.ISLAND_UPDATE_MOCK
+          ? 'chk: JSON.stringify(await window.islandAPI.checkUpdate()),'
+          : '';
         const info = await win.webContents.executeJavaScript(
-          `({ api: typeof window.islandAPI,
+          `(async () => ({ ${chk}
+              api: typeof window.islandAPI,
               cls: document.getElementById('island').className,
               text: document.getElementById('cText').textContent,
               todos: document.querySelectorAll('.todo').length,
-              bounds: [window.outerWidth, window.outerHeight] })`
+              uDot: document.getElementById('uDot').className,
+              ver: document.getElementById('verInfo').textContent,
+              bounds: [window.outerWidth, window.outerHeight] }))()`
         );
         console.log('SELFTEST ' + JSON.stringify(info));
         try {
@@ -355,6 +363,81 @@ function applyLogin(enabled) {
   } catch (e) { boot('autostart err ' + e.message); }
 }
 
+// ---------- 版本检查（轻量提示版） ----------
+// 只比对版本号，不下载、不安装。有新版就在岛上亮个点，点开跳浏览器。
+// 比自动更新省心：portable 版同样有效，也不受 GitHub 下载连通性影响。
+const UPDATE_REPO = 'hhpsilence/to-do-reminder';
+const UPDATE_PAGE = `https://github.com/${UPDATE_REPO}/releases/latest`;
+const CHECK_GAP = 6 * 3600 * 1000;    // 自动检查间隔
+const CHECK_RETRY = 30 * 60 * 1000;   // 检查失败多久后重试
+const CHECK_TIMEOUT = 8000;
+
+let updateInfo = null;   // { version, url, name }，null = 已是最新或还没查到
+let checkedAt = 0;
+let checking = false;
+let lastCheckOk = false; // 上一次检查是否成功（用来区分"已是最新"和"网络失败"）
+
+// "1.2.10" > "1.2.9"；带 -beta 之类的后缀一律先砍掉
+function cmpVersion(a, b) {
+  const norm = (v) => String(v || '').replace(/^v/i, '').split('-')[0]
+    .split('.').map((n) => parseInt(n, 10) || 0);
+  const x = norm(a), y = norm(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+
+async function checkUpdate(force) {
+  if (checking) return updateInfo;
+  if (!force && checkedAt && Date.now() - checkedAt < CHECK_GAP) return updateInfo;
+  checking = true;
+  try {
+    const mock = process.env.ISLAND_UPDATE_MOCK;   // 调试用：假装有新版
+    if (mock) {
+      updateInfo = { version: String(mock).replace(/^v/i, ''), url: UPDATE_PAGE, name: 'v' + mock, mock: true };
+      checkedAt = Date.now();
+      lastCheckOk = true;
+    } else {
+      // net.fetch 走 Chromium 网络栈，会自动跟随系统代理
+      const res = await net.fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
+        headers: {
+          'User-Agent': 'DeskIsland/' + app.getVersion(),
+          'Accept': 'application/vnd.github+json'
+        },
+        signal: AbortSignal.timeout(CHECK_TIMEOUT)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const rel = await res.json();
+      const latest = String(rel.tag_name || rel.name || '').replace(/^v/i, '');
+      boot(`update local=${app.getVersion()} remote=${latest}`);
+      updateInfo = cmpVersion(latest, app.getVersion()) > 0
+        ? { version: latest, url: rel.html_url || UPDATE_PAGE, name: rel.name || ('v' + latest) }
+        : null;
+      checkedAt = Date.now();
+      lastCheckOk = true;
+    }
+  } catch (e) {
+    // 网络不通就安静地算了，不弹任何提示，30 分钟后再试
+    lastCheckOk = false;
+    boot('update check failed: ' + (e && e.message || e));
+  } finally {
+    checking = false;
+  }
+  send('update', updateInfo);
+  return updateInfo;
+}
+
+// 自己排下一次：成功过就 6 小时，失败过就 30 分钟
+function scheduleUpdateCheck(delay) {
+  setTimeout(async () => {
+    if (!win || win.isDestroyed()) return;
+    await checkUpdate(false);
+    scheduleUpdateCheck(checkedAt ? CHECK_GAP : CHECK_RETRY);
+  }, delay);
+}
+
 // ---------- 专注计时 ----------
 function startTicker() {
   setInterval(() => {
@@ -404,7 +487,23 @@ ipcMain.on('presence:hold', (_e, ms) => {
   pinnedUntil = Date.now() + (Number(ms) || 0);
 });
 
-ipcMain.handle('state:get', () => ({ todos, settings, workSec, alerted }));
+ipcMain.handle('state:get', () => ({
+  todos, settings, workSec, alerted,
+  version: app.getVersion(),
+  update: updateInfo
+}));
+
+// 手动检查（设置页点版本号），绕过节流
+ipcMain.handle('update:check', async () => {
+  const info = await checkUpdate(true);
+  return { ok: lastCheckOk, info };
+});
+
+// 有新版本时打开 Release 页面，让用户自己挑 setup / portable
+ipcMain.on('update:open', () => {
+  const url = (updateInfo && updateInfo.url) || UPDATE_PAGE;
+  shell.openExternal(url).catch((e) => boot('openExternal failed: ' + e.message));
+});
 
 ipcMain.handle('todos:save', (_e, list) => {
   todos = Array.isArray(list) ? list : [];
@@ -465,6 +564,9 @@ if (!gotLock) {
     } catch (e) { boot('hotkey err ' + e.message); }
 
     if (process.env.ISLAND_SELFTEST_PRESENCE) runPresenceSelftest();
+
+    // 启动 8 秒后再查版本，别跟开屏抢网络；调试模式提前到 0.5 秒
+    scheduleUpdateCheck(process.env.ISLAND_UPDATE_MOCK ? 500 : 8000);
   });
 
   app.on('window-all-closed', () => { boot('EVENT all-windows-closed'); app.quit(); });

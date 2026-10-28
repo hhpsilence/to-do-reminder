@@ -16,5 +16,10 @@ contextBridge.exposeInMainWorld('islandAPI', {
   onTick: (cb) => ipcRenderer.on('tick', (_e, data) => cb(data)),
   onPresence: (cb) => ipcRenderer.on('presence', (_e, s) => cb(s)),
   onWake: (cb) => ipcRenderer.on('wake', (_e, on) => cb(on)),
-  onSummon: (cb) => ipcRenderer.on('summon', () => cb())
+  onSummon: (cb) => ipcRenderer.on('summon', () => cb()),
+
+  // 版本检查
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  openUpdate: () => ipcRenderer.send('update:open'),
+  onUpdate: (cb) => ipcRenderer.on('update', (_e, info) => cb(info))
 });

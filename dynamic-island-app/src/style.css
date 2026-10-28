@@ -98,7 +98,7 @@ html, body {
 .island.is-collapsed { --w: 250px; --h: 44px; --r: 22px; }
 .island.is-alert    { --w: 420px; --h: 68px; --r: 34px; cursor: default; }
 .island.is-open     { --w: 372px; --h: 308px; --r: 28px; cursor: default; box-shadow: var(--shadow-hi); }
-.island.is-open.is-settings { --h: 344px; }
+.island.is-open.is-settings { --h: 398px; }
 
 .island:hover { box-shadow: var(--shadow-hi); }
 
@@ -125,6 +125,18 @@ html, body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .c-clock { margin-left: auto; font-size: 11.5px; color: var(--sub); flex: none; }
+
+/* 有新版本时，收起态右侧亮一个小点 */
+.u-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex: none;
+  margin-left: 6px; background: var(--accent);
+  opacity: 0; transform: scale(.3);
+  transition: opacity .3s ease, transform .3s cubic-bezier(.32, .72, 0, 1);
+}
+.u-dot.show {
+  opacity: 1; transform: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
 
 /* ---------- 提醒态 ---------- */
 .layer-alert { display: flex; align-items: center; gap: 11px; padding: 0 12px 0 14px; }
@@ -179,6 +191,19 @@ html, body {
 .head .sub { font-size: 10.5px; color: var(--sub); margin-left: auto; }
 .head .sub + .icon-btn { margin-left: 2px; }
 .head .icon-btn:first-child { margin-right: 2px; font-size: 14px; padding-bottom: 1px; }
+
+/* 列表头的新版本胶囊 */
+.upd-chip {
+  display: none; flex: none;
+  font: inherit; font-size: 10px; font-weight: 600;
+  padding: 4px 7px; border-radius: 7px; cursor: pointer;
+  border: 0; background: var(--accent-soft); color: var(--accent);
+  white-space: nowrap;
+  transition: background .16s ease, transform .14s ease;
+}
+.upd-chip.show { display: inline-block; }
+.upd-chip:hover { background: rgba(201, 123, 63, .24); }
+.upd-chip:active { transform: scale(.95); }
 
 /* 待办列表 */
 .todos {
@@ -292,3 +317,13 @@ html, body {
 
 .set-note { font-size: 10.5px; color: var(--sub); line-height: 1.6; padding: 10px 2px 0; }
 .set-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; padding-top: 10px; }
+
+/* 设置页的版本按钮 */
+.ver-btn {
+  font: inherit; font-size: 11.5px; font-weight: 600;
+  padding: 5px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid transparent; background: var(--chip); color: var(--sub);
+  transition: background .16s ease, color .16s ease;
+}
+.ver-btn:hover { background: rgba(120, 90, 60, .12); }
+.ver-btn.has-new { background: var(--accent-soft); color: var(--accent); }

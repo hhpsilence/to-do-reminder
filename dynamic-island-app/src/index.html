@@ -16,6 +16,7 @@
       <span class="dot"></span>
       <span class="c-text" id="cText">暂无待办</span>
       <span class="c-clock mono" id="cClock">45:00</span>
+      <span class="u-dot" id="uDot" title="有新版本"></span>
     </div>
 
     <!-- ============ 提醒态 ============ -->
@@ -39,6 +40,7 @@
         <div class="head">
           <span class="ttl" id="listTitle">今天 · 0 件</span>
           <span class="sub" id="listDate">10月27日 周二</span>
+          <button class="upd-chip" id="updChip" title="有新版本，点我去下载">v1.1.1 ↑</button>
           <button class="icon-btn" id="btnSettings" title="设置">⚙</button>
         </div>
 
@@ -95,6 +97,11 @@
         <div class="set-row">
           <span class="set-label">开机自动启动</span>
           <button class="switch" id="swAutostart" role="switch"><i></i></button>
+        </div>
+
+        <div class="set-row">
+          <span class="set-label">版本</span>
+          <button class="ver-btn" id="verInfo" title="点击检查更新">v1.1.0</button>
         </div>
 
         <div class="set-note">离开电脑超过 3 分钟，专注计时会自动清零。</div>
