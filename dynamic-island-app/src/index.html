@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+<title>灵动岛</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="peek" id="peekBar"></div>
+  <div class="island is-collapsed" id="island">
+
+    <!-- ============ 收起态 ============ -->
+    <div class="layer layer-collapsed">
+      <span class="dot"></span>
+      <span class="c-text" id="cText">暂无待办</span>
+      <span class="c-clock mono" id="cClock">45:00</span>
+    </div>
+
+    <!-- ============ 提醒态 ============ -->
+    <div class="layer layer-alert">
+      <span class="a-emoji">🚶</span>
+      <span class="a-body">
+        <b>坐了 45 分钟啦</b>
+        <span>站起来走两步，顺手倒杯水</span>
+      </span>
+      <span class="a-acts">
+        <button class="btn ghost" id="btnSnooze">稍后 5 分钟</button>
+        <button class="btn solid" id="btnDismiss">好的</button>
+      </span>
+    </div>
+
+    <!-- ============ 展开态 ============ -->
+    <div class="layer layer-open">
+
+      <!-- 待办列表 -->
+      <div class="view view-list" id="viewList">
+        <div class="head">
+          <span class="ttl" id="listTitle">今天 · 0 件</span>
+          <span class="sub" id="listDate">10月27日 周二</span>
+          <button class="icon-btn" id="btnSettings" title="设置">⚙</button>
+        </div>
+
+        <ul class="todos" id="todoList"></ul>
+        <div class="empty" id="emptyTip">还没有待办，下面加一条吧</div>
+
+        <div class="add-row">
+          <span class="plus">＋</span>
+          <input id="todoInput" type="text" maxlength="60" placeholder="添加待办，回车保存" />
+        </div>
+
+        <div class="sit">
+          <div class="sit-row">
+            <span class="lb">本次连续专注</span>
+            <span class="vl mono" id="sitValue">00:00 / 45:00</span>
+          </div>
+          <div class="sit-bar"><i id="sitBar"></i></div>
+          <div class="sit-hint" id="sitHint">保持专注，到点提醒你起身</div>
+        </div>
+      </div>
+
+      <!-- 设置 -->
+      <div class="view view-settings" id="viewSettings">
+        <div class="head">
+          <button class="icon-btn" id="btnBack" title="返回">←</button>
+          <span class="ttl">设置</span>
+          <span class="sub"></span>
+        </div>
+
+        <div class="set-row">
+          <span class="set-label">专注周期</span>
+          <span class="presets" id="presets">
+            <button data-min="25">25</button>
+            <button data-min="45">45</button>
+            <button data-min="60">60</button>
+            <button data-min="90">90</button>
+          </span>
+        </div>
+
+        <div class="set-row">
+          <span class="set-label">起身提醒音</span>
+          <button class="switch" id="swSound" role="switch"><i></i></button>
+        </div>
+
+        <div class="set-row">
+          <span class="set-label">自动收起</span>
+          <span class="presets" id="modes">
+            <button data-mode="always">常驻</button>
+            <button data-mode="hover">悬停</button>
+            <button data-mode="smart">智能</button>
+          </span>
+        </div>
+
+        <div class="set-row">
+          <span class="set-label">开机自动启动</span>
+          <button class="switch" id="swAutostart" role="switch"><i></i></button>
+        </div>
+
+        <div class="set-note">离开电脑超过 3 分钟，专注计时会自动清零。</div>
+        <div class="set-note">智能：动键鼠就收起，静默 15 秒或回到桌面自动出现。悬停：只有鼠标停到顶部细线才出现。也可按 <b>Ctrl+Alt+D</b> 唤出。</div>
+
+        <div class="set-foot">
+          <button class="btn ghost" id="btnTest">试一下提醒</button>
+          <button class="btn danger" id="btnQuit">退出</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script src="renderer.js"></script>
+</body>
+</html>

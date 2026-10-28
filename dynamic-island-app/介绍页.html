@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>灵动岛 · 该做的事，一直在你眼前</title>
+<style>
+:root{
+  --bg:#FBF6EC;
+  --paper:#FFFDF8;
+  --ink:#3E2F22;
+  --ink-2:rgba(62,47,34,.72);
+  --sub:rgba(74,56,38,.55);
+  --line:rgba(120,90,60,.14);
+  --chip:rgba(120,90,60,.07);
+  --accent:#C97B3F;
+  --accent-2:#E0975C;
+  --accent-soft:rgba(201,123,63,.14);
+  --danger:#B5544A;
+  --shadow:0 16px 38px rgba(120,90,60,.22), 0 1px 2px rgba(120,90,60,.14);
+  --shadow-hi:0 22px 48px rgba(120,90,60,.26), 0 2px 4px rgba(120,90,60,.16);
+  --r:20px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"PingFang SC","Microsoft YaHei UI","Segoe UI",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  line-height:1.7;
+  overflow-x:hidden;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(60% 40% at 78% -6%, rgba(224,151,92,.20), transparent 70%),
+    radial-gradient(50% 36% at 8% 4%, rgba(201,123,63,.13), transparent 72%);
+}
+.wrap{max-width:1080px;margin:0 auto;padding:0 26px;position:relative;z-index:1}
+.mono{font-variant-numeric:tabular-nums;font-family:ui-monospace,"Cascadia Mono",Consolas,monospace}
+
+/* ---------- 顶栏 ---------- */
+.nav{
+  position:sticky;top:0;z-index:50;
+  backdrop-filter:blur(14px) saturate(1.4);
+  background:rgba(251,246,236,.78);
+  border-bottom:1px solid rgba(120,90,60,.08);
+}
+.nav-in{display:flex;align-items:center;gap:12px;height:62px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:650;font-size:15px;letter-spacing:.01em}
+.mark{
+  width:34px;height:34px;border-radius:11px;flex:none;position:relative;
+  background:linear-gradient(160deg,#FFF6E6,#F6E3C6);
+  box-shadow:0 4px 12px rgba(120,90,60,.18), inset 0 1px 0 #fff;
+  display:grid;place-items:center;
+}
+.mark i{width:16px;height:8px;border-radius:99px;background:#E8D3B2;position:relative;display:block}
+.mark i::after{
+  content:"";position:absolute;right:-1px;top:50%;transform:translateY(-50%);
+  width:6px;height:6px;border-radius:50%;background:var(--accent);
+}
+.nav .ver{font-size:11px;color:var(--sub);padding:2px 8px;border-radius:99px;background:var(--chip);margin-left:2px}
+.nav-cta{margin-left:auto;display:flex;gap:8px}
+
+.btn{
+  font:inherit;font-size:13.5px;font-weight:600;letter-spacing:.01em;
+  border-radius:999px;padding:10px 20px;border:1px solid transparent;
+  cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:7px;
+  transition:transform .16s ease,box-shadow .16s ease,background .16s ease,filter .16s ease;
+}
+.btn:hover{transform:translateY(-1.5px)}
+.btn:active{transform:translateY(0) scale(.985)}
+.btn-solid{background:var(--accent);color:#FFF9F2;box-shadow:0 8px 20px rgba(201,123,63,.32)}
+.btn-solid:hover{background:#BE7038;box-shadow:0 12px 26px rgba(201,123,63,.38)}
+.btn-ghost{background:var(--chip);color:var(--ink);border-color:var(--line)}
+.btn-ghost:hover{background:rgba(120,90,60,.12)}
+.btn-sm{font-size:12.5px;padding:8px 15px}
+
+/* ---------- Hero ---------- */
+.hero{padding:66px 0 40px;display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+.tag{
+  display:inline-flex;align-items:center;gap:7px;
+  font-size:12px;font-weight:600;color:#8A5A2E;
+  background:rgba(201,123,63,.12);border:1px solid rgba(201,123,63,.2);
+  padding:5px 12px;border-radius:99px;margin-bottom:22px;
+}
+.tag b{width:5px;height:5px;border-radius:50%;background:var(--accent)}
+h1{
+  font-size:46px;line-height:1.28;font-weight:700;letter-spacing:-.015em;
+  margin-bottom:20px;
+}
+h1 em{font-style:normal;color:var(--accent);position:relative;white-space:nowrap}
+h1 em::after{
+  content:"";position:absolute;left:0;right:0;bottom:2px;height:8px;
+  background:rgba(201,123,63,.18);border-radius:4px;z-index:-1;
+}
+.lede{font-size:15.5px;color:var(--ink-2);max-width:430px;margin-bottom:30px}
+.lede b{color:var(--ink);font-weight:600}
+.hero-acts{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.hero-note{font-size:12px;color:var(--sub);margin-top:16px;display:flex;gap:14px;flex-wrap:wrap}
+.hero-note span{display:inline-flex;align-items:center;gap:5px}
+.hero-note span::before{content:"";width:4px;height:4px;border-radius:50%;background:rgba(120,90,60,.35)}
+
+/* ---------- 桌面模拟 ---------- */
+.desk{
+  position:relative;border-radius:24px;overflow:hidden;
+  aspect-ratio:10/9;
+  background:
+    radial-gradient(120% 90% at 22% 8%, #3C4A63 0%, #2A3448 42%, #1D2433 100%);
+  box-shadow:0 30px 70px rgba(60,45,30,.28), 0 2px 6px rgba(60,45,30,.14);
+  display:flex;justify-content:center;align-items:flex-start;
+  padding-top:26px;
+  isolation:isolate;
+}
+.desk::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(90% 60% at 50% 0%, rgba(255,255,255,.10), transparent 60%);
+}
+.desk-hint{
+  position:absolute;bottom:14px;left:0;right:0;text-align:center;
+  font-size:11px;color:rgba(255,255,255,.42);letter-spacing:.02em;z-index:3;
+}
+/* 桌面底部的柔和光晕，让"悬浮在桌面之上"更直观 */
+.desk-glow{
+  position:absolute;left:50%;bottom:-38%;transform:translateX(-50%);
+  width:120%;height:60%;border-radius:50%;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(224,151,92,.20),rgba(224,151,92,.06) 55%,transparent 78%);
+}
+
+/* 岛本体（与应用同款） */
+.island{
+  position:relative;width:250px;height:44px;border-radius:22px;
+  background:#FDF6EA;
+  border:1px solid rgba(255,255,255,.85);
+  box-shadow:var(--shadow);
+  overflow:hidden;cursor:pointer;
+  z-index:2;
+  transition:width .42s cubic-bezier(.32,.72,0,1),
+             height .42s cubic-bezier(.32,.72,0,1),
+             border-radius .42s cubic-bezier(.32,.72,0,1),
+             box-shadow .25s ease;
+}
+.island:hover{box-shadow:var(--shadow-hi)}
+.island.open{width:344px;height:300px;border-radius:26px;cursor:default;box-shadow:var(--shadow-hi)}
+
+.layer{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .18s ease}
+.island:not(.open) .l-collapsed{opacity:1;pointer-events:auto;transition-delay:.12s}
+.island.open .l-open{opacity:1;pointer-events:auto;transition-delay:.16s}
+
+.l-collapsed{display:flex;align-items:center;gap:9px;padding:0 14px}
+.dot{
+  width:8px;height:8px;border-radius:50%;flex:none;background:var(--accent);
+  box-shadow:0 0 0 3.5px var(--accent-soft);
+  animation:breathe 2.8s ease-in-out infinite;
+}
+@keyframes breathe{0%,100%{opacity:1}50%{opacity:.42}}
+.c-text{
+  font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;color:#4A3826;
+}
+.c-clock{margin-left:auto;font-size:11.5px;color:var(--sub);flex:none}
+
+.l-open{display:flex;flex-direction:column;padding:14px 15px 12px}
+.head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.head .ttl{font-size:13.5px;font-weight:650;color:#4A3826}
+.head .sub{font-size:10.5px;color:var(--sub);margin-left:auto}
+.head .gear{
+  width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
+  background:var(--chip);font-size:12px;color:#4A3826;flex:none;
+}
+.todos{list-style:none;display:flex;flex-direction:column;gap:1px;flex:1;min-height:0}
+.todo{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:10px;transition:background .16s}
+.todo:hover{background:var(--chip)}
+.cb{
+  width:16px;height:16px;border-radius:50%;flex:none;
+  border:1.5px solid rgba(120,90,60,.3);display:grid;place-items:center;
+  font-size:9px;color:transparent;cursor:pointer;transition:all .18s;
+}
+.todo.done .cb{background:var(--accent);border-color:var(--accent);color:#fff}
+.todo .tx{font-size:12.5px;line-height:1.4;flex:1;min-width:0;cursor:pointer;color:#4A3826}
+.todo.done .tx{color:var(--sub);text-decoration:line-through}
+.add-row{
+  display:flex;align-items:center;gap:7px;background:var(--chip);
+  border-radius:11px;padding:8px 11px;margin:8px 0 10px;
+  font-size:12px;color:var(--sub);
+}
+.add-row b{color:var(--accent);font-weight:700;font-size:13px}
+.prog{background:rgba(201,123,63,.07);border-radius:12px;padding:9px 11px}
+.prog-top{display:flex;align-items:baseline;gap:6px;font-size:11px;color:var(--sub)}
+.prog-top b{margin-left:auto;font-size:12.5px;color:#4A3826;font-weight:650}
+.bar{height:4px;border-radius:4px;background:rgba(120,90,60,.12);margin:7px 0 6px;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent-2));width:71%}
+.prog-btm{font-size:10.5px;color:var(--sub)}
+
+/* ---------- 数字条 ---------- */
+.stats{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  margin:14px 0 0;
+}
+.stat{padding:26px 10px;text-align:center;border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat b{display:block;font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.2}
+.stat span{font-size:12px;color:var(--sub)}
+
+/* ---------- 区块 ---------- */
+section{padding:78px 0}
+.sec-head{max-width:620px;margin-bottom:44px}
+.kicker{
+  font-size:12px;font-weight:700;letter-spacing:.14em;color:var(--accent);
+  text-transform:uppercase;margin-bottom:12px;
+}
+h2{font-size:31px;line-height:1.35;font-weight:700;letter-spacing:-.01em;margin-bottom:14px}
+.sec-head p{font-size:15px;color:var(--ink-2)}
+
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.card{
+  background:var(--paper);border:1px solid rgba(120,90,60,.10);
+  border-radius:var(--r);padding:26px 24px;
+  box-shadow:0 2px 10px rgba(120,90,60,.05);
+  transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease;
+}
+.card:hover{transform:translateY(-3px);box-shadow:0 14px 32px rgba(120,90,60,.12);border-color:rgba(201,123,63,.24)}
+.card .ico{
+  width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  background:var(--accent-soft);color:var(--accent);margin-bottom:16px;
+}
+.card .ico svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.card h3{font-size:16.5px;font-weight:650;margin-bottom:8px;letter-spacing:.01em}
+.card p{font-size:13.5px;color:var(--ink-2);line-height:1.75}
+
+/* ---------- 三态展示 ---------- */
+.states{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.state{
+  background:linear-gradient(180deg,#2C3648,#1F2634);
+  border-radius:var(--r);padding:30px 16px 22px;min-height:210px;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  box-shadow:0 16px 36px rgba(60,45,30,.18);position:relative;overflow:hidden;
+}
+.state::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(80% 55% at 50% 0%,rgba(255,255,255,.10),transparent 62%);
+}
+.state-cap{margin-top:auto;padding-top:22px;text-align:center;position:relative;z-index:1}
+.state-cap b{display:block;font-size:13.5px;color:#FFF9F2;font-weight:650;margin-bottom:3px}
+.state-cap span{font-size:11.5px;color:rgba(255,255,255,.5)}
+
+/* 静态迷你岛 */
+.mini{
+  background:#FDF6EA;border:1px solid rgba(255,255,255,.85);
+  box-shadow:0 10px 26px rgba(0,0,0,.28);
+  position:relative;z-index:1;flex:none;
+}
+.mini.c{width:206px;height:38px;border-radius:19px;display:flex;align-items:center;gap:8px;padding:0 12px}
+.mini.c .c-text{font-size:11.5px}
+.mini.c .dot{width:7px;height:7px;box-shadow:0 0 0 3px var(--accent-soft)}
+.mini.c .c-clock{font-size:10.5px}
+.mini.a{width:100%;max-width:282px;height:52px;border-radius:26px;display:flex;align-items:center;gap:9px;padding:0 9px 0 11px}
+.mini.a .em{
+  width:28px;height:28px;border-radius:50%;background:var(--accent-soft);
+  display:grid;place-items:center;font-size:14px;flex:none;
+  animation:nudge 2.6s ease-in-out infinite;
+}
+@keyframes nudge{0%,88%,100%{transform:translateX(0)}90%{transform:translateX(-3px)}94%{transform:translateX(3px)}98%{transform:translateX(-1px)}}
+.mini.a .bd{display:flex;flex-direction:column;gap:1px;min-width:0;overflow:hidden}
+.mini.a .bd b{font-size:11.5px;color:#4A3826;font-weight:650;line-height:1.3}
+.mini.a .bd span{font-size:9.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini.a .acts{margin-left:auto;display:flex;gap:4px;flex:none}
+.mini.a .b1,.mini.a .b2{
+  font-size:9.5px;font-weight:600;border-radius:99px;padding:5px 9px;white-space:nowrap;
+}
+.mini.a .b1{background:var(--chip);color:#4A3826}
+.mini.a .b2{background:var(--accent);color:#FFF9F2}
+
+/* 展开态迷你岛 */
+.mini.o{width:264px;height:208px;border-radius:24px;padding:12px 13px;display:flex;flex-direction:column;overflow:hidden}
+.mini.o .head{margin-bottom:6px}
+.mini.o .head .ttl{font-size:12px}
+.mini.o .head .sub{font-size:9.5px}
+.mini.o .gear{width:20px;height:20px;border-radius:7px;font-size:10px}
+.mini.o .todos{list-style:none;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden}
+.mini.o .todo{padding:4px 5px;gap:6px;border-radius:8px}
+.mini.o .cb{width:13px;height:13px;font-size:7px;border-width:1.2px}
+.mini.o .tx{font-size:10.5px;line-height:1.35}
+.mini.o .add-row{margin:5px 0 7px;padding:5px 8px;font-size:10px;gap:5px;border-radius:9px}
+.mini.o .add-row b{font-size:10.5px}
+.mini.o .prog{padding:6px 8px;border-radius:9px}
+.mini.o .prog-top{font-size:9.5px}
+.mini.o .prog-top b{font-size:10.5px}
+.mini.o .bar{height:3px;margin:4px 0 3px}
+
+/* ---------- 计时说明 ---------- */
+.split{display:grid;grid-template-columns:1.05fr .95fr;gap:52px;align-items:center}
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl{display:flex;gap:16px;position:relative;padding-bottom:26px}
+.tl:last-child{padding-bottom:0}
+.tl::before{
+  content:"";position:absolute;left:13px;top:30px;bottom:0;width:1.5px;
+  background:linear-gradient(180deg,rgba(201,123,63,.35),rgba(201,123,63,.06));
+}
+.tl:last-child::before{display:none}
+.tl .n{
+  width:27px;height:27px;border-radius:50%;flex:none;z-index:1;
+  background:var(--paper);border:1.5px solid rgba(201,123,63,.35);
+  display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--accent);
+}
+.tl .bd b{display:block;font-size:14.5px;font-weight:650;margin-bottom:3px}
+.tl .bd span{font-size:13px;color:var(--ink-2)}
+.tl .bd code{
+  background:var(--chip);padding:1px 6px;border-radius:5px;font-size:12px;
+  font-family:ui-monospace,Consolas,monospace;color:#8A5A2E;
+}
+
+.panel{
+  background:var(--paper);border:1px solid rgba(120,90,60,.10);
+  border-radius:var(--r);padding:26px;box-shadow:0 2px 10px rgba(120,90,60,.05);
+}
+.panel h3{font-size:15px;font-weight:650;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.panel h3::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--accent)}
+.row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px dashed rgba(120,90,60,.12);font-size:13px}
+.row:last-child{border-bottom:0;padding-bottom:0}
+.row .k{color:var(--sub);flex:none;width:92px}
+.row .v{font-weight:600;margin-left:auto;text-align:right;font-size:12.5px}
+.row .ok{color:#5C7F4E}
+
+/* ---------- 步骤 ---------- */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:s}
+.step{
+  background:var(--paper);border:1px solid rgba(120,90,60,.10);border-radius:var(--r);
+  padding:26px 24px;position:relative;
+}
+.step::before{
+  counter-increment:s;content:counter(s,decimal-leading-zero);
+  font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.06em;
+  display:block;margin-bottom:12px;
+}
+.step b{display:block;font-size:15px;font-weight:650;margin-bottom:6px}
+.step p{font-size:13px;color:var(--ink-2);line-height:1.7}
+.step code{background:var(--chip);padding:1px 5px;border-radius:5px;font-size:12px;font-family:ui-monospace,Consolas,monospace}
+
+/* ---------- FAQ ---------- */
+.faq{max-width:760px}
+details{
+  border-bottom:1px solid var(--line);padding:20px 0;
+}
+details:first-of-type{border-top:1px solid var(--line)}
+summary{
+  font-size:15px;font-weight:600;cursor:pointer;list-style:none;
+  display:flex;align-items:center;gap:10px;
+}
+summary::-webkit-details-marker{display:none}
+summary::after{
+  content:"+";margin-left:auto;font-size:18px;font-weight:400;color:var(--accent);
+  transition:transform .2s ease;line-height:1;
+}
+details[open] summary::after{transform:rotate(45deg)}
+details p{font-size:13.5px;color:var(--ink-2);margin-top:12px;line-height:1.8;padding-right:28px}
+details code{background:var(--chip);padding:1px 6px;border-radius:5px;font-size:12px;font-family:ui-monospace,Consolas,monospace;color:#8A5A2E}
+
+/* ---------- 下载 ---------- */
+.dl{
+  background:linear-gradient(155deg,#33405A 0%,#232B3B 100%);
+  border-radius:26px;padding:52px 48px;position:relative;overflow:hidden;
+  color:#FFF9F2;
+  box-shadow:0 26px 60px rgba(50,38,26,.28);
+}
+.dl::before{
+  content:"";position:absolute;width:420px;height:420px;border-radius:50%;
+  right:-140px;top:-180px;background:radial-gradient(circle,rgba(224,151,92,.30),transparent 66%);
+}
+.dl::after{
+  content:"";position:absolute;width:300px;height:300px;border-radius:50%;
+  left:-120px;bottom:-160px;background:radial-gradient(circle,rgba(201,123,63,.18),transparent 66%);
+}
+.dl-in{position:relative;z-index:1;display:grid;grid-template-columns:1fr auto;gap:40px;align-items:center}
+.dl h2{color:#FFF9F2;font-size:28px;margin-bottom:10px}
+.dl p{font-size:14px;color:rgba(255,249,242,.66);max-width:420px}
+.dl-btns{display:flex;flex-direction:column;gap:10px}
+.dl-btn{
+  display:flex;align-items:center;gap:12px;text-decoration:none;
+  background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);
+  border-radius:14px;padding:13px 20px;color:#FFF9F2;
+  transition:background .18s ease,transform .18s ease,border-color .18s ease;
+  min-width:268px;
+}
+.dl-btn:hover{background:rgba(255,255,255,.15);transform:translateY(-2px);border-color:rgba(255,255,255,.26)}
+.dl-btn.primary{background:var(--accent);border-color:transparent;box-shadow:0 10px 26px rgba(201,123,63,.34)}
+.dl-btn.primary:hover{background:#D0843F}
+.dl-btn .ic{font-size:17px;flex:none;opacity:.9;width:20px;text-align:center}
+.dl-btn .tx{display:flex;flex-direction:column;gap:1px;min-width:0}
+.dl-btn b{font-size:13.5px;font-weight:650;line-height:1.35}
+.dl-btn .sub{font-size:11px;opacity:.72;line-height:1.35}
+.dl-meta{
+  position:relative;z-index:1;margin-top:30px;padding-top:22px;
+  border-top:1px solid rgba(255,255,255,.12);
+  font-size:11.5px;color:rgba(255,249,242,.45);
+  display:flex;gap:20px;flex-wrap:wrap;
+}
+
+/* ---------- 页脚 ---------- */
+footer{padding:46px 0 60px;text-align:center}
+footer .fl{display:flex;align-items:center;justify-content:center;gap:9px;margin-bottom:12px;color:var(--ink-2);font-size:13px;font-weight:600}
+footer p{font-size:12px;color:var(--sub)}
+
+/* ---------- 入场动画 ---------- */
+.rv{opacity:0;transform:translateY(18px);transition:opacity .7s cubic-bezier(.22,.68,.3,1),transform .7s cubic-bezier(.22,.68,.3,1)}
+.rv.in{opacity:1;transform:none}
+
+/* ---------- 响应式 ---------- */
+@media(max-width:940px){
+  .hero{grid-template-columns:1fr;gap:40px;padding-top:44px}
+  h1{font-size:36px}
+  .desk{width:100%;max-width:440px;margin:0 auto}
+  .cards,.states,.steps{grid-template-columns:1fr}
+  .state{min-height:0;padding:26px 14px 20px}
+  .state-cap{margin-top:16px;padding-top:0}
+  .split{grid-template-columns:1fr;gap:34px}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .stat:nth-child(2){border-right:0}
+  .stat:nth-child(1),.stat:nth-child(2){border-bottom:1px solid var(--line)}
+  .dl{padding:36px 26px}
+  .dl-in{grid-template-columns:1fr;gap:26px}
+  .dl-btn{min-width:0}
+  h2{font-size:25px}
+  section{padding:56px 0}
+  .nav .ver{display:none}
+}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="wrap nav-in">
+    <div class="logo">
+      <div class="mark"><i></i></div>
+      灵动岛
+      <span class="ver">v1.0.0</span>
+    </div>
+    <div class="nav-cta">
+      <a class="btn btn-ghost btn-sm" href="#faq">常见问题</a>
+      <a class="btn btn-solid btn-sm" href="#download">免费下载</a>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div>
+      <div class="tag"><b></b>Windows 10 / 11 · 免安装 · 77 MB</div>
+      <h1>该做的事<br>一直在<em>你眼前</em></h1>
+      <p class="lede">
+        一个贴在屏幕顶部正中的小胶囊。收起时只有一行字，告诉你还有几件待办、还有多久该起身；
+        点开就是今天的清单。<b>不弹窗、不抢焦点、不挡代码。</b>
+      </p>
+      <div class="hero-acts">
+        <a class="btn btn-solid" href="#download">免费下载 ↓</a>
+        <a class="btn btn-ghost" href="#states">看看它长什么样</a>
+      </div>
+      <div class="hero-note">
+        <span>双击即用</span>
+        <span>数据只存本地</span>
+        <span>不联网、不登录</span>
+      </div>
+    </div>
+
+    <div class="desk">
+      <div class="desk-glow"></div>
+      <div class="island" id="demoIsland">
+        <div class="layer l-collapsed">
+          <span class="dot"></span>
+          <span class="c-text">2 项待办 · 提交 Activiti 流…</span>
+          <span class="c-clock mono" id="cd">32:14</span>
+        </div>
+        <div class="layer l-open">
+          <div class="head">
+            <span class="ttl">今天 · 2 件待办</span>
+            <span class="sub">10月27日 周二</span>
+            <span class="gear">⚙</span>
+          </div>
+          <ul class="todos">
+            <li class="todo done"><span class="cb">✓</span><span class="tx">回复张工的接口联调邮件</span></li>
+            <li class="todo"><span class="cb">✓</span><span class="tx">提交 Activiti 流程分支的补丁</span></li>
+            <li class="todo"><span class="cb">✓</span><span class="tx">下午会前过一遍达梦迁移脚本</span></li>
+          </ul>
+          <div class="add-row"><b>＋</b> 添加待办，回车保存</div>
+          <div class="prog">
+            <div class="prog-top">本次连续专注 <b class="mono">32:02 / 45:00</b></div>
+            <div class="bar"><i></i></div>
+            <div class="prog-btm">再过 13 分钟提醒你起身</div>
+          </div>
+        </div>
+      </div>
+      <div class="desk-hint">点一下胶囊试试</div>
+    </div>
+  </div>
+
+  <div class="stats rv">
+    <div class="stat"><b>45<span style="font-size:14px;font-weight:600"> 分钟</span></b><span>默认起身提醒周期</span></div>
+    <div class="stat"><b>0<span style="font-size:14px;font-weight:600"> 次</span></b><span>弹窗打扰</span></div>
+    <div class="stat"><b>77<span style="font-size:14px;font-weight:600"> MB</span></b><span>单文件，免安装</span></div>
+    <div class="stat"><b>100<span style="font-size:14px;font-weight:600">%</span></b><span>数据留在本机</span></div>
+  </div>
+
+  <!-- 核心能力 -->
+  <section>
+    <div class="sec-head rv">
+      <div class="kicker">WHY</div>
+      <h2>它解决的，是三个很小但每天都会烦你的事</h2>
+      <p>不是又一个待办软件，也不是又一个番茄钟。它只是把「你现在该干什么」放到你本来就一直在看的地方。</p>
+    </div>
+    <div class="cards">
+      <div class="card rv">
+        <div class="ico">
+          <svg viewBox="0 0 24 24"><path d="M9 5h9a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h1"/><rect x="8" y="3" width="6" height="4" rx="1.2"/><path d="M8 11.5l1.6 1.6L12.5 10"/><path d="M15 11.5h3M8 17l1.6 1.6L12.5 15.5M15 17h3"/></svg>
+        </div>
+        <h3>待办不藏在第二个窗口里</h3>
+        <p>收起态一行摘要，点开就是清单。回车添加，点圆圈划掉，悬停出现删除。写下来只要两秒，所以你真的会写。</p>
+      </div>
+      <div class="card rv">
+        <div class="ico">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg>
+        </div>
+        <h3>只算你真的在电脑前的时间</h3>
+        <p>每秒读一次系统空闲时间，键鼠有输入才累计。连续 3 分钟没动静就判定你离开了，计时自动清零——开会半小时回来，不会被追着喊起身。</p>
+      </div>
+      <div class="card rv">
+        <div class="ico">
+          <svg viewBox="0 0 24 24"><path d="M4.5 4.5l6.2 15.2 2.3-6.7 6.7-2.3z"/><path d="M13 13l4.5 4.5"/></svg>
+        </div>
+        <h3>平时只留一条细线</h3>
+        <p>鼠标不碰它的时候，屏幕上只有顶端中央一条 4 像素的细线，其余什么都没有——不压浏览器标签栏，不挡任何东西。鼠标停上去 0.2 秒，胶囊才落下来。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 三种形态 -->
+  <section id="states">
+    <div class="sec-head rv">
+      <div class="kicker">STATES</div>
+      <h2>平时一条细线，要用才落下来</h2>
+      <p>没有主界面、没有侧边栏、没有红点未读。鼠标不碰它时，屏幕上只有顶端中央一条 4 像素细线；停上去才展开成下面这三种形态。</p>
+    </div>
+    <div class="states">
+      <div class="state rv">
+        <div class="mini c">
+          <span class="dot"></span>
+          <span class="c-text">2 项待办 · 提交 Activiti 流…</span>
+          <span class="c-clock mono">32:14</span>
+        </div>
+        <div class="state-cap"><b>收起</b><span>一行摘要 + 起身倒计时</span></div>
+      </div>
+      <div class="state rv">
+        <div class="mini o">
+          <div class="head">
+            <span class="ttl">今天 · 2 件待办</span>
+            <span class="sub">10月27日</span>
+            <span class="gear">⚙</span>
+          </div>
+          <ul class="todos">
+            <li class="todo"><span class="cb">✓</span><span class="tx">回复张工的接口联调邮件</span></li>
+            <li class="todo"><span class="cb">✓</span><span class="tx">提交 Activiti 流程补丁</span></li>
+            <li class="todo"><span class="cb">✓</span><span class="tx">过一遍达梦迁移脚本</span></li>
+          </ul>
+          <div class="add-row"><b>＋</b> 添加待办</div>
+          <div class="prog">
+            <div class="prog-top">专注 <b class="mono">32:02 / 45:00</b></div>
+            <div class="bar"><i></i></div>
+          </div>
+        </div>
+        <div class="state-cap"><b>展开</b><span>点一下，清单就在手边</span></div>
+      </div>
+      <div class="state rv">
+        <div class="mini a">
+          <span class="em">🧍</span>
+          <span class="bd">
+            <b>坐了 45 分钟啦</b>
+            <span>站起来走两步，倒杯水</span>
+          </span>
+          <span class="acts">
+            <span class="b1">稍后 5 分钟</span>
+            <span class="b2">好的</span>
+          </span>
+        </div>
+        <div class="state-cap"><b>起身提醒</b><span>到点自动撑开，一句话一个按钮</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 计时 -->
+  <section>
+    <div class="split">
+      <div class="rv">
+        <div class="kicker">TIMER</div>
+        <h2>为什么它不会在你开会时催你喝水</h2>
+        <p style="font-size:15px;color:var(--ink-2);margin-bottom:28px">
+          大多数久坐提醒只会按墙上时钟倒数，你人不在也算数，回来就被积压的提醒糊一脸。
+          这个的计时是「真实在场时长」。
+        </p>
+        <div class="timeline">
+          <div class="tl">
+            <span class="n">1</span>
+            <div class="bd"><b>每秒读一次系统空闲时间</b><span>用 <code>powerMonitor.getSystemIdleTime()</code>，不装驱动、不读键盘内容，只拿一个「多少秒没有输入」的数字。</span></div>
+          </div>
+          <div class="tl">
+            <span class="n">2</span>
+            <div class="bd"><b>有输入才累计</b><span>你在敲代码、点鼠标，专注时长才往前走。</span></div>
+          </div>
+          <div class="tl">
+            <span class="n">3</span>
+            <div class="bd"><b>停手 3 分钟，自动清零</b><span>去开会、去吃饭、去接人，回来从 0 开始算，不会补算也不会催。</span></div>
+          </div>
+          <div class="tl">
+            <span class="n">4</span>
+            <div class="bd"><b>到点只弹一次</b><span>「好的」清零重来，「稍后 5 分钟」推迟，不重复轰炸。</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel rv">
+        <h3>可以调的参数</h3>
+        <div class="row"><span class="k">专注周期</span><span class="v">25 / 45 / 60 / 90 分钟</span></div>
+        <div class="row"><span class="k">离开判定</span><span class="v">3 分钟无输入</span></div>
+        <div class="row"><span class="k">稍后提醒</span><span class="v">推迟 5 分钟</span></div>
+        <div class="row"><span class="k">提醒音</span><span class="v">可开关</span></div>
+        <div class="row"><span class="k">开机自启</span><span class="v">默认开启，可关</span></div>
+        <div class="row"><span class="k">窗口位置</span><span class="v">主屏顶部居中</span></div>
+        <div class="row"><span class="k">网络请求</span><span class="v ok">无</span></div>
+        <div class="row"><span class="k">账号 / 登录</span><span class="v ok">不需要</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 上手 -->
+  <section>
+    <div class="sec-head rv">
+      <div class="kicker">GET STARTED</div>
+      <h2>三步，一分钟</h2>
+    </div>
+    <div class="steps">
+      <div class="step rv"><b>下载并双击</b><p>绿色版是单个 exe，双击就跑，不用安装、不写注册表安装信息、不占「应用列表」。</p></div>
+      <div class="step rv"><b>它就出现在屏幕顶部</b><p>开机自启默认已开，以后每次开机自动出现。建议把 exe 放到固定目录，挪位置后打开一次会自动修正自启路径。</p></div>
+      <div class="step rv"><b>点一下，开始写</b><p>回车添加待办，点圆圈划掉。什么都不用配，45 分钟后它会提醒你起身。</p></div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="sec-head rv">
+      <div class="kicker">FAQ</div>
+      <h2>你可能想问的</h2>
+    </div>
+    <div class="faq">
+      <details open class="rv">
+        <summary>它会挡住浏览器标签栏吗？</summary>
+        <p>不会。鼠标离开 1.2 秒后它就收起，屏幕上只留顶端中央一条 4 像素细线，标签栏完全露出来。需要时把鼠标停到细线上，或者按 <code>Ctrl + Alt + D</code>，胶囊立刻落下来。不想让它收起，设置里关掉「鼠标离开自动收起」即可。</p>
+      </details>
+      <details class="rv">
+        <summary>它会弹窗打断我吗？</summary>
+        <p>不会。它没有独立弹窗，所有提示都在那个胶囊里原地撑开——收起时一行，提醒时一行加两个按钮。而且鼠标不在上面时窗口是完全穿透的，你甚至点不到它，也就不会被误触。</p>
+      </details>
+      <details class="rv">
+        <summary>待办数据存在哪？会上传吗？</summary>
+        <p>纯本地。待办在 <code>%APPDATA%\desk-island\todos.json</code>，设置在同目录的 <code>settings.json</code>。程序里没有任何网络请求，也不需要登录。删掉这两个文件即恢复默认。</p>
+      </details>
+      <details class="rv">
+        <summary>为什么 Windows 提示「已保护你的电脑」？</summary>
+        <p>因为没有买代码签名证书（一年几千块，个人项目不划算）。这不代表文件有问题，只是 Windows 对未签名的 exe 一律先警告。点「更多信息 → 仍要运行」即可。</p>
+      </details>
+      <details class="rv">
+        <summary>免安装版和安装版有什么区别？</summary>
+        <p>功能完全一样，只是分发方式不同。免安装版是单文件自解压，双击后临时解压到 <code>%TEMP%</code> 运行，退出自动清理，所以冷启动要多等几秒；安装版装到 <code>%LOCALAPPDATA%\Programs</code>，有开始菜单和桌面快捷方式，启动更快。两者共用同一份数据，装过安装版的话再开免安装版，待办是同一份。</p>
+      </details>
+      <details class="rv">
+        <summary>支持多显示器吗？能拖动位置吗？</summary>
+        <p>目前固定跟随主显示器的顶部居中，切换分辨率会自动重新居中，但不跟随鼠标所在的屏幕，也不能拖动。这是刻意的——它本来就该待在一个固定、可预期的位置。</p>
+      </details>
+      <details class="rv">
+        <summary>开机自启是怎么实现的？会不会拖慢开机？</summary>
+        <p>写在 <code>HKCU\Software\Microsoft\Windows\CurrentVersion\Run</code> 的 <code>electron.app.DeskIsland</code>，属于当前用户级自启，不需要管理员权限。它是置顶但不抢焦点的窗口，开机后几秒内淡入，几乎无感。</p>
+      </details>
+      <details class="rv">
+        <summary>怎么卸载？</summary>
+        <p>免安装版：退出程序（设置里点退出），删掉 exe 即可；再去注册表删掉那条自启项。安装版：设置 → 应用 → 灵动岛 → 卸载。两种方式都不会删你的待办数据，想彻底清干净再手动删 <code>%APPDATA%\desk-island</code>。</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- 下载 -->
+  <section id="download" style="padding-top:20px">
+    <div class="dl rv">
+      <div class="dl-in">
+        <div>
+          <h2>拿一个试试</h2>
+          <p>Windows 10 / 11 · 64 位。不用注册，不用填邮箱，下载完双击就是全部流程。</p>
+        </div>
+        <div class="dl-btns">
+          <a class="dl-btn primary" href="dist/DeskIsland-1.0.0-portable.exe" download>
+            <span class="ic">⬇</span>
+            <span class="tx"><b>免安装版（推荐）</b><span class="sub">单文件 · 77 MB · 双击即用</span></span>
+          </a>
+          <a class="dl-btn" href="dist/DeskIsland-1.0.0-setup.exe" download>
+            <span class="ic">⬇</span>
+            <span class="tx"><b>安装版</b><span class="sub">NSIS 安装包 · 84 MB · 带快捷方式</span></span>
+          </a>
+        </div>
+      </div>
+      <div class="dl-meta">
+        <span>版本 1.0.0</span>
+        <span>更新于 2026-10-27</span>
+        <span>未签名 · 首次运行需点「仍要运行」</span>
+        <span>可自行修改 · Electron 33</span>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="fl"><div class="mark" style="width:26px;height:26px;border-radius:9px"><i style="width:12px;height:6px"></i></div>灵动岛 · DeskIsland</div>
+    <p>本地运行 · 不收集任何数据 · 待办只存在你自己的电脑里</p>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  // ---- Hero 岛：点击展开 / 收起 ----
+  var island = document.getElementById('demoIsland');
+  var cd = document.getElementById('cd');
+  var left = 32 * 60 + 14;
+
+  island.addEventListener('click', function (e) {
+    if (e.target.closest('.todo, .gear, .add-row')) return;
+    island.classList.toggle('open');
+  });
+
+  // 待办打勾
+  island.querySelectorAll('.todo').forEach(function (li) {
+    li.addEventListener('click', function (e) {
+      e.stopPropagation();
+      li.classList.toggle('done');
+    });
+  });
+
+  // 倒计时真的在走
+  setInterval(function () {
+    if (left > 0) left--;
+    var m = Math.floor(left / 60), s = left % 60;
+    cd.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+  }, 1000);
+
+  // ---- 滚动入场 ----
+  var els = document.querySelectorAll('.rv');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) {
+          en.target.classList.add('in');
+          io.unobserve(en.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    els.forEach(function (el, i) {
+      el.style.transitionDelay = (i % 4) * 60 + 'ms';
+      io.observe(el);
+    });
+  } else {
+    els.forEach(function (el) { el.classList.add('in'); });
+  }
+})();
+</script>
+</body>
+</html>

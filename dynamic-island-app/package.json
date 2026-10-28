@@ -1,0 +1,64 @@
+{
+  "name": "desk-island",
+  "version": "1.0.0",
+  "private": true,
+  "description": "桌面灵动岛 - 待办提醒 + 久坐提醒",
+  "author": "Silence",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis",
+    "dist:portable": "electron-builder --win portable",
+    "dist:dir": "electron-builder --win dir"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.silence.deskisland",
+    "productName": "DeskIsland",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "artifactName": "DeskIsland-${version}-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "灵动岛",
+      "installerLanguages": [
+        "zh_CN"
+      ],
+      "language": "2052",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "DeskIsland-${version}-portable.${ext}",
+      "requestExecutionLevel": "user"
+    }
+  },
+  "dependencies": {
+    "get-windows": "^9.3.0"
+  }
+}
