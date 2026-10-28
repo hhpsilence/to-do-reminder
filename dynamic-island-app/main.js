@@ -219,6 +219,90 @@ function createWindow() {
     });
   }
 
+  // 提醒态自检：真实计时到点弹提醒（智能模式），量按钮位置，再由外部脚本发真点击
+  if (process.env.ISLAND_ALERTTEST) {
+    win.webContents.once('did-finish-load', async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      await sleep(1500);
+      settings.presenceMode = 'smart';
+      settings.autoIdle = true;
+      settings.workMinutes = 1;
+      idleOverride = 0;            // 假装一直在动电脑：不该自动弹出，只能靠提醒钉住
+      workSec = 0;
+      alerted = false;
+      const wb0 = win.getBounds();
+      // 「好的」按钮在窗口内的中心约 (392, 42)：只有提醒态 420px 宽时才落在岛里
+      testPoint = { x: wb0.x + 392, y: wb0.y + 42 };   // 注入假光标，别被真人动鼠标干扰
+      fs.writeFileSync(path.join(os.tmpdir(), 'island-alerttest-pre.json'), JSON.stringify({
+        win: wb0, parkAt: { x: wb0.x + 392, y: wb0.y + 42 }
+      }));
+      console.log('ALERTTEST_ARMED 等 60 秒到点');
+
+      const t0 = Date.now();
+      while (!alerted && Date.now() - t0 < 80000) await sleep(200);
+      if (!alerted) { console.log('ALERTTEST_TIMEOUT'); app.quit(); return; }
+      const tAlert = Date.now();
+      console.log('ALERTTEST_FIRED at ' + (tAlert - t0) + 'ms');
+      // 提醒弹出的头 1.5 秒里，每 50ms 记一次 presence：
+      // near = 窗口还在穿透（点不到），over = 已接管鼠标
+      const marks = [];
+      for (let k = 0; k < 30; k++) {
+        const wbx = win.getBounds();
+        const ib = { x: wbx.x + islandBox.x, y: wbx.y + islandBox.y, w: islandBox.w, h: islandBox.h };
+        const cur = cursorPoint();
+        marks.push((Date.now() - tAlert) + 'ms:' + presence + ':' + islandBox.x + ',' + islandBox.w +
+          ':cur=' + cur.x + ',' + cur.y + ':on=' + inBox(cur, ib, 2));
+        await sleep(50);
+      }
+      console.log('ALERTTEST_RAMP ' + marks.join(' '));
+      await sleep(300);
+
+      const info = await win.webContents.executeJavaScript(`(() => {
+        const i = document.getElementById('island');
+        const b = document.getElementById('btnDismiss').getBoundingClientRect();
+        return {
+          cls: i.className,
+          island: { x: i.offsetLeft, y: i.offsetTop, w: i.offsetWidth, h: i.offsetHeight },
+          btn: { x: b.x, y: b.y, w: b.width, h: b.height }
+        };
+      })()`);
+
+      const wb = win.getBounds();
+      const bc = {
+        x: Math.round(info.btn.x + info.btn.w / 2),
+        y: Math.round(info.btn.y + info.btn.h / 2)
+      };
+      const btnScreen = { x: wb.x + bc.x, y: wb.y + bc.y };
+      const reported = {
+        x: wb.x + islandBox.x, y: wb.y + islandBox.y, w: islandBox.w, h: islandBox.h
+      };
+      fs.writeFileSync(path.join(os.tmpdir(), 'island-alerttest.json'), JSON.stringify({
+        clsBefore: info.cls,
+        islandInWindow: info.island,
+        reportedScreen: reported,
+        btnCenterInWindow: bc,
+        btnCenterOnScreen: btnScreen,
+        onIslandByBox: inBox(btnScreen, reported, 2),
+        presenceAtReady: presence
+      }));
+      console.log('ALERTTEST_READY ' + JSON.stringify({
+        btnScreen, reported, onIsland: inBox(btnScreen, reported, 2), presence
+      }));
+
+      const t1 = Date.now();
+      let last = '';
+      const iv = setInterval(() => {
+        const line = presence + '|' + alerted;
+        if (line !== last) {
+          last = line;
+          console.log('ALERTTEST_STATE t=' + (Date.now() - t1) + ' presence=' + presence + ' alerted=' + alerted);
+        }
+      }, 100);
+      ipcMain.on('alert:dismiss', () => console.log('ALERTTEST_DISMISS t=' + (Date.now() - t1)));
+      setTimeout(() => { clearInterval(iv); app.quit(); }, 14000);
+    });
+  }
+
   // 截图自检：分别抓收起态和唤出态，确认透明窗口渲染正常
   if (process.env.ISLAND_SHOT) {
     const outDir = process.env.ISLAND_SHOT;
@@ -341,11 +425,12 @@ function pollPresence() {
 
   // ---- 岛已可见 ----
   // 光标在岛上：短暂停顿后接管鼠标（防快速划过时误吞点击）
+  // 被钉住的时候（起身提醒没处理 / 输入框聚焦）不留这个延迟，否则提醒刚弹出那一下点不动
   if (onIsland) {
     leaveAt = 0; peekAt = 0;
     if (presence === 'over') return;
     if (!enterAt) enterAt = now;
-    if (now - enterAt >= OVER_DELAY) { enterAt = 0; setPresence('over'); }
+    if (now - enterAt >= (keepOpen ? 0 : OVER_DELAY)) { enterAt = 0; setPresence('over'); }
     return;
   }
 
@@ -575,7 +660,7 @@ function scheduleUpdateCheck(delay) {
 function startTicker() {
   setInterval(() => {
     if (!win || win.isDestroyed()) return;
-    const idle = powerMonitor.getSystemIdleTime();   // 秒
+    const idle = idleSeconds();   // 秒；走 idleSeconds() 才能被自检注入假值
     const total = Math.max(1, Number(settings.workMinutes) || 45) * 60;
 
     if (idle >= 180) {
@@ -589,6 +674,7 @@ function startTicker() {
     if (!alerted && workSec >= total) {
       alerted = true;
       workSec = total;
+      boot('alert fired total=' + total);
     }
 
     win.webContents.send('tick', {
@@ -613,6 +699,7 @@ ipcMain.on('ui:rect', (_e, r) => {
 ipcMain.on('presence:pin', (_e, on) => {
   pinForever = !!on;
   if (!on) leaveAt = 0;
+  pollPresence();   // 立刻按新状态算一次，别等下一轮 60ms 轮询
 });
 
 // 快捷键唤出后短暂停留，避免鼠标不在岛上立刻被收起
@@ -703,8 +790,12 @@ ipcMain.handle('settings:save', (_e, patch) => {
   return settings;
 });
 
-ipcMain.on('alert:dismiss', () => { workSec = 0; alerted = false; });
+ipcMain.on('alert:dismiss', () => {
+  boot('alert dismiss');
+  workSec = 0; alerted = false;
+});
 ipcMain.on('alert:snooze', () => {
+  boot('alert snooze');
   const total = Math.max(1, Number(settings.workMinutes) || 45) * 60;
   workSec = Math.max(0, total - 300);   // 5 分钟后再提醒
   alerted = false;

@@ -170,6 +170,10 @@ set ISLAND_SHOT=C:\temp && npx electron .
 |---|---|
 | `ISLAND_UPDATE_MOCK=1.2.0` | 假装远端有 1.2.0，用来看新版本提示长什么样（不发网络请求） |
 | `ISLAND_USERDATA=C:\temp\x` | 换一份数据目录，自检或想同时开两份时用，不动日常数据 |
+| `ISLAND_SELFTEST=1` | 起来就检查 DOM 结构、加一条待办、然后退出 |
+| `ISLAND_SELFTEST_PRESENCE=1` | 喂一串假光标位置，走一遍 idle → near → over → idle |
+| `ISLAND_DRAGTEST=1` | 走完整条拖拽 IPC，验证窗口真的移动、位置被记住 |
+| `ISLAND_ALERTTEST=1` | 把专注时长压到 1 分钟等提醒自己弹出，逐 50ms 记 `presence` 和上报的岛矩形，用来验证提醒刚弹出时按钮是不是立刻可点 |
 
 页面本身支持用 hash 预览各种状态，浏览器直接打开 `src/index.html` 也能看（走内置 mock 数据）：
 

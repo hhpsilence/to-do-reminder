@@ -9,13 +9,14 @@ let state = {
   idle: 0,
   active: true,
   alerted: false,
-  version: '1.3.0',
+  version: '1.3.1',
   update: null          // { mode, status, version, percent, error }
 };
 
 let ui = 'collapsed';     // collapsed | alert | open
 let view = 'list';        // list | settings
 let preview = false;      // 手动试提醒时，屏蔽真实计时状态的干扰
+let alertMutedUntil = 0;  // 刚点掉提醒后的一小段时间，忽略在途的旧 tick，别又弹回来
 
 const $ = (id) => document.getElementById(id);
 const island = $('island');
@@ -119,6 +120,7 @@ function renderSit() {
   const bar = $('sitBar');
   bar.style.width = pct + '%';
   bar.classList.toggle('warn', left <= 300);
+  $('aTitle').textContent = `坐了 ${Math.round(total / 60)} 分钟啦`;
 
   let hint;
   if (state.idle >= 180) hint = '检测到你已经离开，计时已重置';
@@ -208,16 +210,25 @@ function setUI(next) {
 }
 
 /* 把岛在窗口内的矩形上报给主进程，用于判断光标是否落在岛上 */
+// 注意：--w / --h 不参与过渡，能立刻读到这一态的最终尺寸；
+// 而 offsetWidth 在 420ms 的宽度动画期间还是旧值，按它上报会让
+// 提醒态右侧的「好的」按钮有半秒点不到（窗口还在穿透）。所以按目标尺寸算。
+function targetBox() {
+  const cs = getComputedStyle(island);
+  const w = parseFloat(cs.getPropertyValue('--w')) || island.offsetWidth;
+  const h = parseFloat(cs.getPropertyValue('--h')) || island.offsetHeight;
+  const sw = stage.clientWidth || 0;
+  return {
+    x: Math.round((sw - w) / 2),
+    y: island.offsetTop,
+    w: Math.round(w),
+    h: Math.round(h)
+  };
+}
+
 function reportRect() {
   if (!island.offsetWidth) return;
-  try {
-    api.setIslandRect({
-      x: island.offsetLeft,
-      y: island.offsetTop,
-      w: island.offsetWidth,
-      h: island.offsetHeight
-    });
-  } catch (_) {}
+  try { api.setIslandRect(targetBox()); } catch (_) {}
 }
 
 function setView(next) {
@@ -330,6 +341,7 @@ $('btnBack').addEventListener('click', (e) => { e.stopPropagation(); setView('li
 $('btnDismiss').addEventListener('click', (e) => {
   e.stopPropagation();
   preview = false;
+  alertMutedUntil = Date.now() + 2000;   // 主进程收到 dismiss 之前发出来的 tick 还带着 alerted=true
   pinReasons.delete('alert');
   syncPin();
   api.dismissAlert();
@@ -343,6 +355,7 @@ $('btnDismiss').addEventListener('click', (e) => {
 $('btnSnooze').addEventListener('click', (e) => {
   e.stopPropagation();
   preview = false;
+  alertMutedUntil = Date.now() + 2000;
   pinReasons.delete('alert');
   syncPin();
   api.snoozeAlert();
@@ -519,6 +532,7 @@ api.onTick((data) => {
   renderCollapsed();
 
   if (data.alerted) {
+    if (Date.now() < alertMutedUntil) return;   // 刚点掉，忽略在途的旧 tick
     if (ui !== 'alert') {
       preview = true;
       setUI('alert');
@@ -610,7 +624,7 @@ function createMock() {
       settings: data.settings,
       workSec: data.workSec,
       alerted: false,
-      version: '1.3.0',
+      version: '1.3.1',
       update: null
     }),
     saveTodos: async (list) => { data.todos = list; save(); return list; },
