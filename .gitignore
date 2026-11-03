@@ -18,5 +18,8 @@ desktop.ini
 # 日志
 *.log
 
+# 设计原型（选型用，不参与打包）
+dynamic-island-app/统计原型.html
+
 # WorkBuddy 本地工作区数据
 .workbuddy-ai/

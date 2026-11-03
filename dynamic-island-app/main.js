@@ -48,6 +48,11 @@ let alerted = false;      // 是否已经弹过提醒（等用户处理）
 const dataDir = () => app.getPath('userData');
 const todosFile = () => path.join(dataDir(), 'todos.json');
 const settingsFile = () => path.join(dataDir(), 'settings.json');
+const historyFile = () => path.join(dataDir(), 'history.json');
+
+// 起身记录：{ days: { 'YYYY-MM-DD': { done, snooze, times[] } } }，只留最近 400 天
+const HISTORY_DAYS = 400;
+let history = { days: {} };
 
 function loadData() {
   try {
@@ -71,6 +76,81 @@ function loadData() {
   }
   if ('idleSec' in settings) { delete settings.idleSec; dirty = true; }
   if (dirty) saveSettings();   // 迁移结果落盘，别每次启动都算一遍
+
+  // 起身记录
+  try {
+    const raw = JSON.parse(fs.readFileSync(historyFile(), 'utf8'));
+    if (raw && raw.days && typeof raw.days === 'object') history = { days: raw.days };
+  } catch (_) { /* 首次运行，没有就没有 */ }
+  if (pruneHistory()) saveHistory();
+}
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+function dayKey(d = new Date()) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function saveHistory() {
+  try {
+    fs.mkdirSync(dataDir(), { recursive: true });
+    fs.writeFileSync(historyFile(), JSON.stringify(history), 'utf8');
+  } catch (e) { console.error('保存起身记录失败', e); }
+}
+
+// 超过 400 天就把最老的删掉；返回是否真的删了
+function pruneHistory() {
+  const keys = Object.keys(history.days).sort();
+  if (keys.length <= HISTORY_DAYS) return false;
+  keys.slice(0, keys.length - HISTORY_DAYS).forEach((k) => { delete history.days[k]; });
+  return true;
+}
+
+// kind: 'done'（点了「好的」）| 'snooze'（点了「稍后」）
+function recordHit(kind) {
+  const key = dayKey();
+  const day = history.days[key] || (history.days[key] = { done: 0, snooze: 0, times: [] });
+  if (!Array.isArray(day.times)) day.times = [];
+  if (kind === 'snooze') {
+    day.snooze = (day.snooze || 0) + 1;
+  } else {
+    day.done = (day.done || 0) + 1;
+    const now = new Date();
+    day.times.push(pad2(now.getHours()) + ':' + pad2(now.getMinutes()));
+    if (day.times.length > 240) day.times.splice(0, day.times.length - 240);
+  }
+  pruneHistory();
+  saveHistory();
+  boot(`stats record ${kind} -> ${key} done=${day.done} snooze=${day.snooze}`);
+  if (win && !win.isDestroyed()) win.webContents.send('stats', history);
+}
+
+// 自检：跑一遍记录 + 裁剪，打印结果后退出（不建窗口）
+function runStatsSelftest() {
+  const out = {};
+  recordHit('done');
+  recordHit('done');
+  recordHit('snooze');
+  out.today = history.days[dayKey()];
+  out.fileExists = fs.existsSync(historyFile());
+
+  // 塞 450 天，看裁剪是不是只留 400
+  const probe = { days: {} };
+  for (let i = 0; i < 450; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    probe.days[dayKey(d)] = { done: 1, snooze: 0, times: [] };
+  }
+  history = probe;
+  out.before = Object.keys(history.days).length;
+  out.pruned = pruneHistory();
+  out.after = Object.keys(history.days).length;
+  const keys = Object.keys(history.days).sort();
+  out.oldest = keys[0];
+  out.newest = keys[keys.length - 1];
+
+  console.log('STATSTEST ' + JSON.stringify(out));
+  setTimeout(() => app.quit(), 200);
 }
 
 function saveTodos() {
@@ -318,6 +398,37 @@ function createWindow() {
       testPoint = { x: b.x + WIN_W / 2, y: b.y + 2 };
       await new Promise((r) => setTimeout(r, 1400));
       await shot('shot-near');
+      setTimeout(() => app.quit(), 200);
+    });
+  }
+
+  // 起身记录端到端自检：真窗口 + 真 IPC，打开统计页把三档都截一遍
+  if (process.env.ISLAND_STATSOPEN) {
+    const outDir = process.env.ISLAND_STATSOPEN;
+    win.webContents.once('did-finish-load', async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      await sleep(1600);
+      await win.webContents.executeJavaScript(
+        "stage.classList.remove('is-away'); setUI('open'); setView('stats');"
+      );
+      await sleep(700);
+      for (const [name, range] of [['e2e-day', 'day'], ['e2e-week', 'week'], ['e2e-month', 'month']]) {
+        await win.webContents.executeJavaScript(
+          `document.querySelector('#statSeg b[data-range="${range}"]').click()`
+        );
+        await sleep(350);
+        const img = await win.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, name + '.png'), img.toPNG());
+        console.log('STATSSHOT ' + name);
+      }
+      const probe = await win.webContents.executeJavaScript(`(() => {
+        const keys = Object.keys(state.history.days).sort();
+        const b = document.getElementById('statsBody');
+        return { days: keys.length, last: keys[keys.length - 1],
+                 rec: state.history.days[keys[keys.length - 1]],
+                 overflow: b.scrollHeight - b.clientHeight };
+      })()`);
+      console.log('STATSPROBE ' + JSON.stringify(probe));
       setTimeout(() => app.quit(), 200);
     });
   }
@@ -745,10 +856,12 @@ ipcMain.on('drag:reset', () => {
 });
 
 ipcMain.handle('state:get', () => ({
-  todos, settings, workSec, alerted,
+  todos, settings, workSec, alerted, history,
   version: app.getVersion(),
   update: upd
 }));
+
+ipcMain.handle('stats:get', () => history);
 
 // 手动检查（设置页点版本号），绕过节流
 ipcMain.handle('update:check', async () => {
@@ -790,12 +903,15 @@ ipcMain.handle('settings:save', (_e, patch) => {
   return settings;
 });
 
-ipcMain.on('alert:dismiss', () => {
-  boot('alert dismiss');
+// isTest=true 是设置页「试一下提醒」弹的，不该算进起身记录
+ipcMain.on('alert:dismiss', (_e, isTest) => {
+  boot('alert dismiss' + (isTest ? ' (test)' : ''));
+  if (!isTest) recordHit('done');
   workSec = 0; alerted = false;
 });
-ipcMain.on('alert:snooze', () => {
-  boot('alert snooze');
+ipcMain.on('alert:snooze', (_e, isTest) => {
+  boot('alert snooze' + (isTest ? ' (test)' : ''));
+  if (!isTest) recordHit('snooze');
   const total = Math.max(1, Number(settings.workMinutes) || 45) * 60;
   workSec = Math.max(0, total - 300);   // 5 分钟后再提醒
   alerted = false;
@@ -814,6 +930,7 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     boot('ready');
     loadData();
+    if (process.env.ISLAND_STATSTEST) { runStatsSelftest(); return; }
     nativeTheme.themeSource = 'light';
     createWindow();
     boot('window created');

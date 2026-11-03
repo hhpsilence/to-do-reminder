@@ -9,13 +9,15 @@ let state = {
   idle: 0,
   active: true,
   alerted: false,
-  version: '1.3.2',
+  history: { days: {} },   // 起身记录 { 'YYYY-MM-DD': { done, snooze, times[] } }
+  version: '1.4.0',
   update: null          // { mode, status, version, percent, error }
 };
 
 let ui = 'collapsed';     // collapsed | alert | open
-let view = 'list';        // list | settings
+let view = 'list';        // list | settings | stats
 let preview = false;      // 手动试提醒时，屏蔽真实计时状态的干扰
+let testAlert = false;    // 这次提醒是「试一下提醒」弹的，不该记进起身记录
 let alertMutedUntil = 0;  // 刚点掉提醒后的一小段时间，忽略在途的旧 tick，别又弹回来
 
 const $ = (id) => document.getElementById(id);
@@ -193,6 +195,237 @@ function renderUpdate() {
     : '点击检查更新';
 }
 
+/* ================= 起身记录 ================= */
+const WD_MON = ['一', '二', '三', '四', '五', '六', '日'];
+const WD_SUN = ['日', '一', '二', '三', '四', '五', '六'];
+const statsView = { range: 'day', weekOff: 0, monthOff: 0 };
+const MAX_WEEK_BACK = 52, MAX_MONTH_BACK = 13;
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const hKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const hm2min = (t) => {
+  const p = String(t).split(':');
+  return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0);
+};
+
+function addDays(d, n) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() + n);
+  return x;
+}
+// 周一为一周之始
+function weekStart(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+function doneOf(key) {
+  const days = (state.history && state.history.days) || {};
+  const v = days[key];
+  return v && v.done ? v.done : 0;
+}
+function timesOf(key) {
+  const days = (state.history && state.history.days) || {};
+  const v = days[key];
+  return v && Array.isArray(v.times) ? v.times : [];
+}
+function hLevel(n) {
+  return n >= 4 ? 'hl4' : n === 3 ? 'hl3' : n === 2 ? 'hl2' : n === 1 ? 'hl1' : 'hl0';
+}
+// 连续天数：今天还没起身不算断，从昨天往前数
+function streakDays() {
+  let n = 0;
+  let d = new Date();
+  if (doneOf(hKey(d)) === 0) d = addDays(d, -1);
+  while (n < 400 && doneOf(hKey(d)) > 0) { n++; d = addDays(d, -1); }
+  return n;
+}
+// 这一周的平均：本周只按已经过去的天数算，别用 7 天拉低
+function weekAvgOf(base) {
+  const now = new Date();
+  const isCur = hKey(base) === hKey(weekStart(now));
+  let sum = 0;
+  for (let i = 0; i < 7; i++) sum += doneOf(hKey(addDays(base, i)));
+  const den = isCur ? ((now.getDay() + 6) % 7) + 1 : 7;
+  return sum / den;
+}
+
+/* ---------- 日：时间轴 + 倒计时 + 当天明细 ---------- */
+function statsDay() {
+  const now = new Date();
+  const key = hKey(now);
+  const times = timesOf(key);
+  const count = Math.max(times.length, doneOf(key));
+  const total = state.total || 1;
+  const left = Math.max(0, total - state.workSec);
+  const pct = Math.min(100, (state.workSec / total) * 100);
+
+  let gap = '';
+  if (times.length >= 2) {
+    let s = 0;
+    for (let i = 1; i < times.length; i++) s += Math.max(0, hm2min(times[i]) - hm2min(times[i - 1]));
+    gap = Math.round(s / (times.length - 1)) + ' 分钟';
+  }
+
+  const yest = doneOf(hKey(addDays(now, -1)));
+  const diff = count - yest;
+  const cmp = diff === 0 ? '和昨天一样' : diff > 0 ? `比昨天多 ${diff} 次` : `比昨天少 ${-diff} 次`;
+  const pos = (h) => 4 + (h / 24) * 92;
+  const pins = times.map((t, i) =>
+    `<div class="pin${i === times.length - 1 ? ' on' : ''}" style="left:${pos(hm2min(t) / 60).toFixed(2)}%"></div>`
+  ).join('');
+  const ax = [0, 6, 12, 18, 24].map((h) =>
+    `<div class="ax" style="left:${pos(h).toFixed(2)}%">${h}:00</div>`
+  ).join('');
+
+  const logs = times.length
+    ? times.map((t, i) =>
+      `<div class="st-log"><span class="d"></span><span class="t">${t}</span><span class="k">第 ${i + 1} 次</span></div>`
+    ).join('')
+    : '<div class="st-empty">点「好的」记一次<br>点「稍后 5 分钟」不算</div>';
+
+  const lead = times.length
+    ? `最后一次 <i>${times[times.length - 1]}</i>${gap ? ` ｜ 平均间隔 ${gap}` : ''} ｜ ${cmp}`
+    : '今天还没有起身记录';
+
+  return `
+    <div class="st-big"><b>${count}</b><span>次</span>
+      <span style="margin-left:auto;font-size:10.5px;color:var(--sub)">今天</span></div>
+    <div class="st-sub">${lead}</div>
+    <div class="st-tl"><div class="rail"></div>${pins}${ax}</div>
+    <div class="st-prog">
+      <div class="r"><span>距离下次起身提醒</span><b id="stLeft">${mmss(left)} / ${mmss(total)}</b></div>
+      <div class="b"><i id="stBarFill" style="width:${pct}%"></i></div>
+    </div>
+    <div class="st-logs">${logs}</div>
+    <div class="st-legend">本周日均 ${weekAvgOf(weekStart(now)).toFixed(1)} 次 ｜ 连续 ${streakDays()} 天</div>
+  `;
+}
+
+/* ---------- 周：7 根柱 ---------- */
+function statsWeek() {
+  const now = new Date();
+  const isCur = statsView.weekOff === 0;
+  const base = addDays(weekStart(now), -statsView.weekOff * 7);
+
+  const counts = [];
+  for (let i = 0; i < 7; i++) counts.push(doneOf(hKey(addDays(base, i))));
+
+  const total = counts.reduce((a, b) => a + b, 0);
+  const max = Math.max(1, ...counts);
+  const todayIdx = isCur ? (now.getDay() + 6) % 7 : -1;
+  const avg = weekAvgOf(base);
+  // 本周只看已经过去的日子，别把周三之后算成「断」
+  const elapsed = isCur ? todayIdx + 1 : 7;
+  const zero = counts.slice(0, elapsed).filter((c) => c === 0).length;
+  const bestIdx = counts.indexOf(Math.max(...counts));
+  const best = Math.max(...counts) > 0 ? `${WD_MON[bestIdx]} ${counts[bestIdx]} 次` : '—';
+
+  const bars = counts.map((c, i) => {
+    const h = Math.max(6, Math.round((c / max) * 128));
+    const on = i === todayIdx;
+    const full = todayIdx === -1 && c > 0;
+    return `<div class="st-bar${on ? ' on' : ''}${full ? ' full' : ''}${c === 0 ? ' zero' : ''}">
+      <u>${c}</u><i style="height:${h}px"></i></div>`;
+  }).join('');
+  const xlab = WD_MON.map((t) => `<span>${t}</span>`).join('');
+
+  return `
+    <div class="st-big"><b>${total}</b><span>次</span>
+      <span class="st-nav">
+        <button id="wkPrev" title="上一周">‹</button>
+        <i>${isCur ? '本周' : `${base.getMonth() + 1}/${base.getDate()}`}</i>
+        <button id="wkNext" title="下一周"${isCur ? ' disabled' : ''}>›</button>
+      </span></div>
+    <div class="st-sub">日均 <i>${avg.toFixed(1)}</i> 次 ｜ 最好 ${best} ｜ 断 ${zero} 天</div>
+    <div class="st-bars">${bars}</div>
+    <div class="st-xlab">${xlab}</div>
+    <div class="st-kpi">
+      <div><b>${total}</b><span>${isCur ? '本周合计' : '当周合计'}</span></div>
+      <div><b>${avg.toFixed(1)}</b><span>日均</span></div>
+      <div><b>${streakDays()}</b><span>连续天数</span></div>
+    </div>
+  `;
+}
+
+/* ---------- 月：方块热力日历 ---------- */
+function statsMonth() {
+  const now = new Date();
+  const base = new Date(now.getFullYear(), now.getMonth() - statsView.monthOff, 1);
+  const y = base.getFullYear(), m = base.getMonth();
+  const len = new Date(y, m + 1, 0).getDate();
+  const startDow = base.getDay();
+  const isCur = statsView.monthOff === 0;
+  const todayD = now.getDate();
+
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push('<div class="st-cell void"></div>');
+
+  let total = 0, zero = 0, run = 0, bestRun = 0, elapsed = 0;
+  for (let d = 1; d <= len; d++) {
+    if (isCur && d > todayD) { cells.push(`<div class="st-cell future"><u>${d}</u></div>`); continue; }
+    elapsed++;
+    const c = doneOf(`${y}-${pad2(m + 1)}-${pad2(d)}`);
+    total += c;
+    if (c === 0) { zero++; run = 0; } else { run++; if (run > bestRun) bestRun = run; }
+    const cls = `st-cell ${hLevel(c)}${isCur && d === todayD ? ' today' : ''}`;
+    cells.push(`<div class="${cls}"><u>${d}</u>${c || ''}</div>`);
+  }
+  while (cells.length % 7) cells.push('<div class="st-cell void"></div>');
+
+  let rows = '';
+  for (let r = 0; r < cells.length / 7; r++) {
+    rows += `<div class="st-row">${cells.slice(r * 7, r * 7 + 7).join('')}</div>`;
+  }
+  const wd = WD_SUN.map((t) => `<span>${t}</span>`).join('');
+  const avg = elapsed ? total / elapsed : 0;
+  const label = y === now.getFullYear() ? `${m + 1} 月` : `${y}.${m + 1}`;
+
+  return `
+    <div class="st-big"><b>${total}</b><span>次</span>
+      <span class="st-nav">
+        <button id="moPrev" title="上个月">‹</button>
+        <i>${label}</i>
+        <button id="moNext" title="下个月"${isCur ? ' disabled' : ''}>›</button>
+      </span></div>
+    <div class="st-sub">日均 <i>${avg.toFixed(1)}</i> 次 ｜ 断 ${zero} 天 ｜ 最长连续 ${bestRun} 天</div>
+    <div class="st-wd">${wd}</div>
+    <div class="st-grid">${rows}</div>
+    <div class="st-legend">少 <i class="hl0"></i><i class="hl1"></i><i class="hl2"></i><i class="hl3"></i><i class="hl4"></i> 多 ｜ 一格一天</div>
+  `;
+}
+
+function renderStats() {
+  const body = $('statsBody');
+  if (!body) return;
+  $('statSeg').querySelectorAll('b').forEach((b) => {
+    b.classList.toggle('on', b.dataset.range === statsView.range);
+  });
+
+  if (statsView.range === 'day') body.innerHTML = statsDay();
+  else if (statsView.range === 'week') body.innerHTML = statsWeek();
+  else body.innerHTML = statsMonth();
+
+  const bind = (id, fn) => {
+    const el = $(id);
+    if (el) el.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
+  };
+  bind('wkPrev', () => {
+    statsView.weekOff = Math.min(statsView.weekOff + 1, MAX_WEEK_BACK);
+    renderStats();
+  });
+  bind('wkNext', () => {
+    if (statsView.weekOff > 0) { statsView.weekOff--; renderStats(); }
+  });
+  bind('moPrev', () => {
+    statsView.monthOff = Math.min(statsView.monthOff + 1, MAX_MONTH_BACK);
+    renderStats();
+  });
+  bind('moNext', () => {
+    if (statsView.monthOff > 0) { statsView.monthOff--; renderStats(); }
+  });
+}
+
 /* ---------- 状态切换 ---------- */
 function setUI(next) {
   ui = next;
@@ -200,9 +433,10 @@ function setUI(next) {
   island.classList.add('is-' + next);
   if (next === 'open') {
     view = 'list';
-    island.classList.remove('is-settings');
+    island.classList.remove('is-settings', 'is-stats');
     $('viewList').classList.remove('hidden');
     $('viewSettings').classList.add('hidden');
+    $('viewStats').classList.add('hidden');
   }
   // 尺寸变了，立刻告诉主进程新的可点击范围
   reportRect();
@@ -234,9 +468,12 @@ function reportRect() {
 function setView(next) {
   view = next;
   island.classList.toggle('is-settings', next === 'settings');
+  island.classList.toggle('is-stats', next === 'stats');
   $('viewList').classList.toggle('hidden', next !== 'list');
   $('viewSettings').classList.toggle('hidden', next !== 'settings');
+  $('viewStats').classList.toggle('hidden', next !== 'stats');
   if (next === 'settings') renderSettings();
+  if (next === 'stats') renderStats();
   reportRect();
   setTimeout(reportRect, 460);
 }
@@ -338,13 +575,31 @@ $('posModes').addEventListener('click', async (e) => {
 $('btnSettings').addEventListener('click', (e) => { e.stopPropagation(); setView('settings'); });
 $('btnBack').addEventListener('click', (e) => { e.stopPropagation(); setView('list'); });
 
+$('btnStats').addEventListener('click', (e) => {
+  e.stopPropagation();
+  statsView.weekOff = 0;
+  statsView.monthOff = 0;
+  setView('stats');
+});
+$('btnStatsBack').addEventListener('click', (e) => { e.stopPropagation(); setView('list'); });
+$('statSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('b');
+  if (!b) return;
+  e.stopPropagation();
+  if (statsView.range === b.dataset.range) return;
+  statsView.range = b.dataset.range;
+  renderStats();
+});
+
 $('btnDismiss').addEventListener('click', (e) => {
   e.stopPropagation();
+  const wasTest = testAlert;
   preview = false;
+  testAlert = false;
   alertMutedUntil = Date.now() + 2000;   // 主进程收到 dismiss 之前发出来的 tick 还带着 alerted=true
   pinReasons.delete('alert');
   syncPin();
-  api.dismissAlert();
+  api.dismissAlert(wasTest);
   state.workSec = 0;
   state.alerted = false;
   renderSit();
@@ -354,11 +609,13 @@ $('btnDismiss').addEventListener('click', (e) => {
 
 $('btnSnooze').addEventListener('click', (e) => {
   e.stopPropagation();
+  const wasTest = testAlert;
   preview = false;
+  testAlert = false;
   alertMutedUntil = Date.now() + 2000;
   pinReasons.delete('alert');
   syncPin();
-  api.snoozeAlert();
+  api.snoozeAlert(wasTest);
   state.workSec = Math.max(0, state.total - 300);
   state.alerted = false;
   renderSit();
@@ -448,6 +705,7 @@ $('swIdle').addEventListener('click', async (e) => {
 $('btnTest').addEventListener('click', (e) => {
   e.stopPropagation();
   preview = true;
+  testAlert = true;
   setUI('alert');
   chime();
 });
@@ -531,10 +789,22 @@ api.onTick((data) => {
   renderSit();
   renderCollapsed();
 
+  // 统计页开着的时候，日视图的倒计时跟着走（只改这两个节点，不整块重绘）
+  if (view === 'stats' && statsView.range === 'day') {
+    const total = state.total || 1;
+    const left = Math.max(0, total - state.workSec);
+    const pct = Math.min(100, (state.workSec / total) * 100);
+    const fill = $('stBarFill');
+    const txt = $('stLeft');
+    if (fill) fill.style.width = pct + '%';
+    if (txt) txt.textContent = `${mmss(left)} / ${mmss(total)}`;
+  }
+
   if (data.alerted) {
     if (Date.now() < alertMutedUntil) return;   // 刚点掉，忽略在途的旧 tick
     if (ui !== 'alert') {
       preview = true;
+      testAlert = false;                        // 真提醒，要记进起身记录
       setUI('alert');
       chime();
       pinReasons.add('alert');
@@ -554,6 +824,7 @@ api.onTick((data) => {
     state.workSec = s.workSec || 0;
     state.total = (state.settings.workMinutes || 45) * 60;
     state.alerted = !!s.alerted;
+    state.history = s.history && s.history.days ? s.history : { days: {} };
     state.version = s.version || state.version;
     state.update = s.update || null;
   }
@@ -568,6 +839,9 @@ api.onTick((data) => {
   if (hash.length) stage.classList.remove('is-away');
   if (hash.includes('open')) setUI('open');
   if (hash.includes('settings')) { setUI('open'); setView('settings'); }
+  if (hash.includes('stats')) { setUI('open'); setView('stats'); }
+  if (hash.includes('stats-week')) { statsView.range = 'week'; setUI('open'); setView('stats'); }
+  if (hash.includes('stats-month')) { statsView.range = 'month'; setUI('open'); setView('stats'); }
   if (hash.includes('alert')) { preview = true; setUI('alert'); }
   if (hash.includes('away')) { stage.classList.add('is-away'); }
   if (hash.includes('wake')) { stage.classList.add('is-away', 'is-wake'); }
@@ -584,6 +858,14 @@ if (api.onUpdate) {
   api.onUpdate((info) => {
     state.update = info || null;
     renderUpdate();
+  });
+}
+
+// 记了一笔起身，主进程推新数据过来
+if (api.onStats) {
+  api.onStats((h) => {
+    state.history = h && h.days ? h : { days: {} };
+    if (view === 'stats') renderStats();
   });
 }
 
@@ -604,7 +886,43 @@ function createMock() {
     ];
   }
 
+  // 预览用的假起身记录：近 75 天，今天固定 3 次，方便看效果
+  const k2 = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  if (!data.history || !data.history.days) {
+    const days = {};
+    const now = new Date();
+    for (let i = 1; i < 75; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      if (Math.random() < 0.13 || (d.getDay() === 0 && Math.random() < 0.45)) continue;
+      const n = 1 + Math.floor(Math.random() * 4);
+      const times = [];
+      let t = 9 * 60 + Math.floor(Math.random() * 50);
+      for (let j = 0; j < n; j++) {
+        times.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+        t += 45 + Math.floor(Math.random() * 55);
+      }
+      days[k2(d)] = { done: n, snooze: 0, times };
+    }
+    days[k2(now)] = { done: 3, snooze: 1, times: ['09:12', '10:05', '11:20'] };
+    data.history = { days };
+  }
+
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (_) {} };
+  save();   // 假数据也落盘，别每次刷新都换一批
+
+  const recordMock = (kind) => {
+    const key = k2(new Date());
+    const day = data.history.days[key] || (data.history.days[key] = { done: 0, snooze: 0, times: [] });
+    if (kind === 'snooze') {
+      day.snooze = (day.snooze || 0) + 1;
+    } else {
+      day.done = (day.done || 0) + 1;
+      const d = new Date();
+      day.times.push(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+    }
+    save();
+  };
+
   let tickCb = null;
 
   setInterval(() => {
@@ -624,13 +942,21 @@ function createMock() {
       settings: data.settings,
       workSec: data.workSec,
       alerted: false,
-      version: '1.3.2',
+      history: data.history,
+      version: '1.4.0',
       update: null
     }),
+    getStats: async () => data.history,
     saveTodos: async (list) => { data.todos = list; save(); return list; },
     saveSettings: async (patch) => { Object.assign(data.settings, patch); save(); return data.settings; },
-    dismissAlert: () => { data.workSec = 0; },
-    snoozeAlert: () => { data.workSec = Math.max(0, data.settings.workMinutes * 60 - 300); },
+    dismissAlert: (isTest) => {
+      data.workSec = 0;
+      if (!isTest) recordMock('done');
+    },
+    snoozeAlert: (isTest) => {
+      data.workSec = Math.max(0, data.settings.workMinutes * 60 - 300);
+      if (!isTest) recordMock('snooze');
+    },
     setIslandRect: () => {},
     pin: () => {},
     hold: () => {},
@@ -645,6 +971,7 @@ function createMock() {
     onPresence: () => {},
     onWake: () => {},
     onSummon: () => {},
-    onUpdate: () => {}
+    onUpdate: () => {},
+    onStats: () => {}
   };
 }

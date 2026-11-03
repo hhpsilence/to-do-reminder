@@ -2,10 +2,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('islandAPI', {
   getState: () => ipcRenderer.invoke('state:get'),
+  getStats: () => ipcRenderer.invoke('stats:get'),
   saveTodos: (list) => ipcRenderer.invoke('todos:save', list),
   saveSettings: (patch) => ipcRenderer.invoke('settings:save', patch),
-  dismissAlert: () => ipcRenderer.send('alert:dismiss'),
-  snoozeAlert: () => ipcRenderer.send('alert:snooze'),
+  dismissAlert: (isTest) => ipcRenderer.send('alert:dismiss', !!isTest),
+  snoozeAlert: (isTest) => ipcRenderer.send('alert:snooze', !!isTest),
   quit: () => ipcRenderer.send('app:quit'),
 
   // 显隐相关
@@ -23,6 +24,7 @@ contextBridge.exposeInMainWorld('islandAPI', {
   onPresence: (cb) => ipcRenderer.on('presence', (_e, s) => cb(s)),
   onWake: (cb) => ipcRenderer.on('wake', (_e, on) => cb(on)),
   onSummon: (cb) => ipcRenderer.on('summon', () => cb()),
+  onStats: (cb) => ipcRenderer.on('stats', (_e, h) => cb(h)),
 
   // 版本检查与更新
   checkUpdate: () => ipcRenderer.invoke('update:check'),

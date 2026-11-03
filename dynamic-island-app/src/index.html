@@ -42,6 +42,13 @@
           <span class="ttl" id="listTitle">今天 · 0 件</span>
           <span class="sub" id="listDate">10月27日 周二</span>
           <button class="upd-chip" id="updChip" title="有新版本，点我去下载">v1.1.1 ↑</button>
+          <button class="icon-btn" id="btnStats" title="起身记录">
+            <svg width="13" height="13" viewBox="0 0 14 14" aria-hidden="true">
+              <rect x="1.4" y="7.2" width="2.8" height="5.4" rx="1.1" fill="currentColor"/>
+              <rect x="5.6" y="3.4" width="2.8" height="9.2" rx="1.1" fill="currentColor"/>
+              <rect x="9.8" y="5.4" width="2.8" height="7.2" rx="1.1" fill="currentColor"/>
+            </svg>
+          </button>
           <button class="icon-btn" id="btnSettings" title="设置">⚙</button>
         </div>
 
@@ -129,6 +136,18 @@
           <button class="btn ghost" id="btnTest">试一下提醒</button>
           <button class="btn danger" id="btnQuit">退出</button>
         </div>
+      </div>
+
+      <!-- 起身记录 -->
+      <div class="view view-stats hidden" id="viewStats">
+        <div class="head">
+          <button class="icon-btn" id="btnStatsBack" title="返回">←</button>
+          <span class="ttl">起身记录</span>
+          <span class="seg" id="statSeg">
+            <b data-range="day">日</b><b data-range="week">周</b><b data-range="month">月</b>
+          </span>
+        </div>
+        <div class="stats-body" id="statsBody"></div>
       </div>
 
     </div>

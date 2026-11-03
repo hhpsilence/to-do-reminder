@@ -378,3 +378,183 @@ html, body {
 }
 .ver-btn:hover { background: rgba(120, 90, 60, .12); }
 .ver-btn.has-new { background: var(--accent-soft); color: var(--accent); }
+
+/* ================= 起身记录 ================= */
+.island.is-open.is-stats { --h: 400px; }
+
+/* 日 / 周 / 月 分段 */
+.seg {
+  margin-left: auto; display: inline-flex; gap: 3px;
+  background: var(--chip); padding: 3px; border-radius: 9px;
+}
+.seg b {
+  font-size: 10.5px; font-weight: 600;
+  padding: 4px 9px; border-radius: 7px;
+  color: var(--sub); cursor: pointer;
+  transition: background .16s ease, color .16s ease;
+}
+.seg b:hover { background: rgba(120, 90, 60, .10); }
+.seg b.on { background: var(--accent); color: #FFF9F2; box-shadow: 0 2px 6px rgba(194, 90, 56, .26); }
+
+.stats-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+
+/* 大数字 */
+.st-big { display: flex; align-items: baseline; gap: 5px; margin: 2px 0 3px; flex: none; }
+.st-big b {
+  font-size: 31px; line-height: 1.05; font-weight: 700; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.st-big span { font-size: 11px; color: var(--sub); }
+
+/* 周 / 月 翻页 */
+.st-nav { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; }
+.st-nav button {
+  width: 20px; height: 20px; border-radius: 6px; flex: none;
+  border: 0; cursor: pointer; font: inherit; font-size: 11px; line-height: 1;
+  background: var(--chip); color: var(--fg);
+  display: grid; place-items: center;
+  transition: background .16s ease, transform .14s ease;
+}
+.st-nav button:hover { background: var(--accent-soft); }
+.st-nav button:active { transform: scale(.94); }
+.st-nav button:disabled { opacity: .3; cursor: default; }
+.st-nav i {
+  font-style: normal; font-size: 10.5px; font-weight: 600;
+  color: var(--fg); min-width: 58px; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.st-sub {
+  font-size: 10.5px; line-height: 1.55; color: var(--sub);
+  margin-bottom: 10px; flex: none;
+}
+.st-sub i { font-style: normal; color: var(--accent); font-weight: 600; }
+
+/* ---------- 日：时间轴 ---------- */
+.st-tl { position: relative; height: 72px; margin: 2px 0 4px; flex: none; }
+.st-tl .rail {
+  position: absolute; left: 0; right: 0; top: 30px; height: 3px; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(194, 90, 56, .10), rgba(194, 90, 56, .28));
+}
+.st-tl .pin {
+  position: absolute; top: 22px; width: 11px; height: 11px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--bg);
+  box-shadow: 0 2px 7px rgba(194, 90, 56, .4);
+  transform: translateX(-50%);
+}
+.st-tl .pin.on { box-shadow: 0 0 0 4px var(--accent-soft), 0 2px 7px rgba(194, 90, 56, .4); }
+.st-tl .ax {
+  position: absolute; top: 42px; transform: translateX(-50%);
+  font-size: 8px; color: rgba(63, 53, 80, .32);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 进度条 */
+.st-prog { flex: none; }
+.st-prog .r { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.st-prog .r span { font-size: 10px; color: var(--sub); }
+.st-prog .r b { font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.st-prog .b { height: 5px; border-radius: 3px; background: rgba(120, 90, 60, .11); overflow: hidden; }
+.st-prog .b i {
+  display: block; height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+  transition: width .45s linear;
+}
+
+/* 当天记录 */
+.st-logs {
+  display: flex; flex-direction: column; gap: 1px;
+  margin-top: 12px; min-height: 0; overflow-y: auto; overflow-x: hidden;
+}
+.st-logs::-webkit-scrollbar { width: 4px; }
+.st-logs::-webkit-scrollbar-thumb { background: rgba(120, 90, 60, .18); border-radius: 4px; }
+.st-log { display: flex; align-items: center; gap: 9px; padding: 8px; border-radius: 9px; flex: none; }
+.st-log:nth-child(odd) { background: var(--chip); }
+.st-log .d {
+  width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.st-log .t { font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.st-log .k { margin-left: auto; font-size: 9.5px; color: var(--sub); }
+
+.st-empty {
+  font-size: 11px; line-height: 1.8; color: var(--sub);
+  text-align: center; padding: 14px 8px; flex: 1 1 auto;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ---------- 周：柱状 ---------- */
+.st-bars { display: flex; align-items: flex-end; gap: 9px; height: 142px; margin-bottom: 4px; flex: none; }
+.st-bar {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 5px;
+}
+.st-bar u {
+  font-size: 9.5px; font-weight: 650; text-decoration: none;
+  color: var(--sub); font-variant-numeric: tabular-nums;
+}
+.st-bar i {
+  width: 100%; max-width: 24px; border-radius: 6px 6px 3px 3px;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  opacity: .4; display: block;
+}
+.st-bar.on i { opacity: 1; box-shadow: 0 5px 14px rgba(194, 90, 56, .34); }
+.st-bar.on u { color: var(--accent); }
+/* 看的是过去的周，没有「今天」可高亮，就整排实色 */
+.st-bar.full i { opacity: 1; }
+.st-bar.zero i { height: 3px !important; opacity: .2; border-radius: 3px; }
+
+.st-xlab {
+  display: flex; gap: 9px; flex: none;
+  border-top: 1px solid var(--line); padding-top: 5px;
+}
+.st-xlab span { flex: 1 1 0; text-align: center; font-size: 9px; color: rgba(63, 53, 80, .4); }
+
+/* KPI 小卡 */
+.st-kpi { display: flex; gap: 7px; margin-top: auto; padding-top: 11px; flex: none; }
+.st-kpi div { flex: 1 1 0; background: var(--chip); border-radius: 11px; padding: 8px 9px 9px; }
+.st-kpi b {
+  display: block; font-size: 15px; font-weight: 700;
+  font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.st-kpi span { font-size: 9px; color: var(--sub); }
+
+/* ---------- 月：方块热力 ---------- */
+.st-wd { display: flex; gap: 6px; justify-content: center; margin: 0 0 5px; flex: none; }
+.st-wd span {
+  width: 40px; flex: none; text-align: center;
+  font-size: 9px; font-weight: 600; color: rgba(63, 53, 80, .36);
+}
+
+.st-grid { display: flex; flex-direction: column; gap: 6px; flex: none; }
+.st-row { display: flex; gap: 6px; justify-content: center; }
+
+.st-cell {
+  width: 40px; height: 34px; border-radius: 8px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 650;
+  position: relative;
+}
+.st-cell u {
+  position: absolute; top: 1px; left: 4px;
+  font-size: 8px; font-weight: 600; text-decoration: none; opacity: .62;
+}
+.st-cell.void { background: transparent; color: transparent; }
+/* 本月还没到的日子：留个淡淡的日期，让日历骨架还在 */
+.st-cell.future { background: transparent; color: transparent; }
+.st-cell.future u { color: rgba(63, 53, 80, .40); opacity: .6; }
+.st-cell.today { outline: 2px solid rgba(44, 76, 150, .5); outline-offset: 1px; }
+
+/* 热力色阶 */
+.hl0 { background: rgba(92, 72, 112, .055); color: rgba(63, 53, 80, .30); }
+.hl1 { background: rgba(194, 90, 56, .15); color: rgba(150, 60, 35, .92); }
+.hl2 { background: rgba(194, 90, 56, .34); color: rgba(120, 45, 25, .95); }
+.hl3 { background: rgba(194, 90, 56, .62); color: #FFF7EF; }
+.hl4 { background: rgba(194, 90, 56, .88); color: #FFF7EF; }
+
+.st-legend {
+  display: flex; align-items: center; gap: 5px; flex: none;
+  margin-top: auto; padding-top: 9px;
+  font-size: 9.5px; color: var(--sub);
+}
+.st-legend i { width: 11px; height: 11px; border-radius: 3px; display: block; }
