@@ -384,9 +384,19 @@ html, body {
 
 /* 日 / 周 / 月 分段 */
 .seg {
-  margin-left: auto; display: inline-flex; gap: 3px;
+  margin-left: 6px; display: inline-flex; gap: 3px;
   background: var(--chip); padding: 3px; border-radius: 9px;
 }
+/* 「详细」：弹独立大窗口看整月 */
+.seg-more {
+  margin-left: auto; flex: none;
+  font: inherit; font-size: 10.5px; font-weight: 600;
+  padding: 5px 8px; border-radius: 7px; cursor: pointer;
+  border: 1px solid transparent; background: var(--chip); color: var(--sub);
+  transition: background .16s ease, color .16s ease, transform .14s ease;
+}
+.seg-more:hover { background: var(--accent-soft); color: var(--accent); }
+.seg-more:active { transform: scale(.95); }
 .seg b {
   font-size: 10.5px; font-weight: 600;
   padding: 4px 9px; border-radius: 7px;
@@ -544,6 +554,9 @@ html, body {
 .st-cell.future { background: transparent; color: transparent; }
 .st-cell.future u { color: rgba(63, 53, 80, .40); opacity: .6; }
 .st-cell.today { outline: 2px solid rgba(44, 76, 150, .5); outline-offset: 1px; }
+/* 点格子会弹出详细页，给个可点的反馈 */
+.st-cell.pick { cursor: pointer; transition: box-shadow .16s ease, transform .14s ease; }
+.st-cell.pick:hover { box-shadow: 0 0 0 2px var(--accent-soft); transform: translateY(-1px); }
 
 /* 热力色阶 */
 .hl0 { background: rgba(92, 72, 112, .055); color: rgba(63, 53, 80, .30); }

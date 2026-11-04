@@ -38,6 +38,7 @@ const AUTO_IDLE_MIN = 5;   // 智能模式：键鼠停多久（分钟）就自�
 const HIDE_FAST = 400;     // 自动显示出来的岛，用户一动就快速收回
 
 let win = null;
+let statsWin = null;      // 起身记录详细页（独立窗口，按需创建）
 let todos = [];
 let settings = { workMinutes: 45, autostart: true, sound: true, presenceMode: 'smart', idleMin: 5, autoIdle: true, draggable: false, winPos: null };
 
@@ -123,6 +124,7 @@ function recordHit(kind) {
   saveHistory();
   boot(`stats record ${kind} -> ${key} done=${day.done} snooze=${day.snooze}`);
   if (win && !win.isDestroyed()) win.webContents.send('stats', history);
+  if (statsWin && !statsWin.isDestroyed()) statsWin.webContents.send('stats', history);
 }
 
 // 自检：跑一遍记录 + 裁剪，打印结果后退出（不建窗口）
@@ -433,6 +435,112 @@ function createWindow() {
     });
   }
 
+  // 详细页自检：从岛上真的点一下「详细」，再把详细页的三个状态截一遍
+  if (process.env.ISLAND_DETAILSHOT) {
+    const outDir = process.env.ISLAND_DETAILSHOT;
+    win.webContents.once('did-finish-load', async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      await sleep(1600);
+
+      // 走完整条链路：岛 → 渲染层按钮 → IPC → 新窗口
+      await win.webContents.executeJavaScript(
+        "stage.classList.remove('is-away'); setUI('open'); setView('stats');" +
+        "statsView.range = 'month'; renderStats();" +
+        "document.getElementById('btnStatsFull').click(); true"
+      );
+
+      const t0 = Date.now();
+      while ((!statsWin || statsWin.webContents.isLoading()) && Date.now() - t0 < 8000) await sleep(100);
+      if (!statsWin) { console.log('DETAILSHOT_NOWIN'); app.quit(); return; }
+      await sleep(900);
+
+      const shot = async (name) => {
+        const img = await statsWin.webContents.capturePage();
+        fs.writeFileSync(path.join(outDir, name + '.png'), img.toPNG());
+        console.log('DETAILSHOT ' + name + ' ' + JSON.stringify(statsWin.getBounds()));
+      };
+
+      await shot('detail-month');
+
+      const probe = await statsWin.webContents.executeJavaScript(`(() => {
+        const g = document.getElementById('grid');
+        const cells = g.querySelectorAll('.cell[data-d]');
+        const first = cells[0] && cells[0].getBoundingClientRect();
+        const side = document.getElementById('side');
+        return {
+          cells: cells.length,
+          cellW: first && Math.round(first.width),
+          cellH: first && Math.round(first.height),
+          gridOverflow: g.scrollHeight - g.clientHeight,
+          sideOverflow: side.scrollHeight - side.clientHeight,
+          kpi: document.getElementById('kpis').textContent.replace(/\\s+/g, ' ').trim(),
+          bars: [...document.querySelectorAll('.wb')].map(el => ({
+            h: Math.round(el.querySelector('i').getBoundingClientRect().height),
+            v: el.title, on: el.classList.contains('on') })),
+          sel: (document.querySelector('.cell.sel') || {}).dataset,
+          sideText: side.textContent.replace(/\\s+/g, ' ').trim().slice(0, 120)
+        };
+      })()`);
+      console.log('DETAILPROBE ' + JSON.stringify(probe));
+
+      // 点 11/3（那天 6 次），看明细跟着换
+      const clicked = await statsWin.webContents.executeJavaScript(`(() => {
+        const c = document.querySelector('.cell[data-d="2026-11-03"]');
+        if (c) c.click();
+        return c ? c.dataset.d : '';
+      })()`);
+      console.log('DETAILSHOT click ' + clicked);
+      await sleep(350);
+      await shot('detail-day');
+
+      // 上一月
+      await statsWin.webContents.executeJavaScript("document.getElementById('mPrev').click(); true");
+      await sleep(400);
+      await shot('detail-prev');
+
+      // 再验一遍「窗口已开着时，从岛上点格子跳过去」
+      await win.webContents.executeJavaScript(
+        "statsView.monthOff = 1; renderStats(); true"
+      );
+      await sleep(250);
+      const jumped = await win.webContents.executeJavaScript(`(() => {
+        const c = document.querySelector('.st-cell[data-d="2026-10-03"]');
+        if (c) c.click();
+        return c ? c.dataset.d : '';
+      })()`);
+      await sleep(500);
+      const focus = await statsWin.webContents.executeJavaScript(`({
+        label: document.getElementById('mLabel').textContent,
+        sel: (document.querySelector('.cell.sel') || {}).dataset
+      })`);
+      console.log('DETAILFOCUS ' + JSON.stringify({ clicked: jumped, focus }));
+
+      // 空白的一天长什么样
+      await statsWin.webContents.executeJavaScript(`(() => {
+        const c = document.querySelector('.cell[data-d="2026-10-04"]');
+        if (c) c.click();
+        return true;
+      })()`);
+      await sleep(300);
+      await shot('detail-empty');
+
+      // 最小尺寸下会不会挤爆
+      statsWin.setSize(800, 560);
+      await sleep(450);
+      await shot('detail-small');
+      const small = await statsWin.webContents.executeJavaScript(`(() => {
+        const g = document.getElementById('grid');
+        const side = document.getElementById('side');
+        return { gridOverflow: g.scrollHeight - g.clientHeight,
+                 sideOverflow: side.scrollHeight - side.clientHeight,
+                 bodyOverflow: document.body.scrollHeight - document.body.clientHeight };
+      })()`);
+      console.log('DETAILSMALL ' + JSON.stringify(small));
+
+      setTimeout(() => app.quit(), 300);
+    });
+  }
+
   // 显示器分辨率变化时重新居中
   const recenter = () => {
     if (!win || win.isDestroyed()) return;
@@ -442,6 +550,57 @@ function createWindow() {
   screen.on('display-metrics-changed', recenter);
   screen.on('display-added', recenter);
   screen.on('display-removed', recenter);
+}
+
+// ---------- 起身记录详细页（独立窗口） ----------
+// 岛里的月视图只有 40px 一格，日期数字小得看不清。
+// 点「详细」或点某一格，就弹这个窗口：整月大日历 + 当天明细。
+function openStatsWindow(dayKey) {
+  if (statsWin && !statsWin.isDestroyed()) {
+    if (statsWin.isMinimized()) statsWin.restore();
+    statsWin.show();
+    statsWin.focus();
+    if (dayKey) statsWin.webContents.send('stats:focusDay', dayKey);
+    return statsWin;
+  }
+
+  const { workArea } = screen.getPrimaryDisplay();
+  const W = Math.min(1000, Math.max(800, workArea.width - 240));
+  const H = Math.min(760, Math.max(560, workArea.height - 180));
+
+  statsWin = new BrowserWindow({
+    width: W,
+    height: H,
+    x: Math.round(workArea.x + (workArea.width - W) / 2),
+    y: Math.round(workArea.y + (workArea.height - H) / 2),
+    minWidth: 760,
+    minHeight: 520,
+    frame: false,
+    transparent: false,
+    backgroundColor: '#FAF2E4',
+    resizable: true,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: false,
+    alwaysOnTop: false,
+    title: '起身记录',
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  statsWin.loadFile(path.join(__dirname, 'src', 'stats.html'), dayKey ? { hash: 'd=' + dayKey } : {});
+  statsWin.once('ready-to-show', () => {
+    statsWin.show();
+    statsWin.focus();
+  });
+  statsWin.on('closed', () => { statsWin = null; });
+  statsWin.webContents.on('did-fail-load', (_e, code, desc) => boot('stats did-fail-load ' + code + ' ' + desc));
+  boot('stats window opened ' + W + 'x' + H + (dayKey ? ' day=' + dayKey : ''));
+  return statsWin;
 }
 
 // ---------- 显隐状态机 ----------
@@ -862,6 +1021,15 @@ ipcMain.handle('state:get', () => ({
 }));
 
 ipcMain.handle('stats:get', () => history);
+
+// 岛上点「详细」或点某一天 → 弹出详细页（已开着就跳到那天）
+ipcMain.on('stats:open', (_e, day) => openStatsWindow(typeof day === 'string' ? day : ''));
+
+// 详细页是无边框窗口，最小化要自己接一下
+ipcMain.on('win:minimize', (e) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (w && !w.isDestroyed()) w.minimize();
+});
 
 // 手动检查（设置页点版本号），绕过节流
 ipcMain.handle('update:check', async () => {

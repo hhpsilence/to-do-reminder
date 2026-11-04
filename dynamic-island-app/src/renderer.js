@@ -10,7 +10,7 @@ let state = {
   active: true,
   alerted: false,
   history: { days: {} },   // 起身记录 { 'YYYY-MM-DD': { done, snooze, times[] } }
-  version: '1.4.0',
+  version: '1.4.1',
   update: null          // { mode, status, version, percent, error }
 };
 
@@ -365,11 +365,12 @@ function statsMonth() {
   for (let d = 1; d <= len; d++) {
     if (isCur && d > todayD) { cells.push(`<div class="st-cell future"><u>${d}</u></div>`); continue; }
     elapsed++;
-    const c = doneOf(`${y}-${pad2(m + 1)}-${pad2(d)}`);
+    const k = `${y}-${pad2(m + 1)}-${pad2(d)}`;
+    const c = doneOf(k);
     total += c;
     if (c === 0) { zero++; run = 0; } else { run++; if (run > bestRun) bestRun = run; }
-    const cls = `st-cell ${hLevel(c)}${isCur && d === todayD ? ' today' : ''}`;
-    cells.push(`<div class="${cls}"><u>${d}</u>${c || ''}</div>`);
+    const cls = `st-cell pick ${hLevel(c)}${isCur && d === todayD ? ' today' : ''}`;
+    cells.push(`<div class="${cls}" data-d="${k}" title="看 ${m + 1}/${d} 的明细"><u>${d}</u>${c || ''}</div>`);
   }
   while (cells.length % 7) cells.push('<div class="st-cell void"></div>');
 
@@ -391,7 +392,7 @@ function statsMonth() {
     <div class="st-sub">日均 <i>${avg.toFixed(1)}</i> 次 ｜ 断 ${zero} 天 ｜ 最长连续 ${bestRun} 天</div>
     <div class="st-wd">${wd}</div>
     <div class="st-grid">${rows}</div>
-    <div class="st-legend">少 <i class="hl0"></i><i class="hl1"></i><i class="hl2"></i><i class="hl3"></i><i class="hl4"></i> 多 ｜ 一格一天</div>
+    <div class="st-legend">少 <i class="hl0"></i><i class="hl1"></i><i class="hl2"></i><i class="hl3"></i><i class="hl4"></i> 多 ｜ 点格子看详细</div>
   `;
 }
 
@@ -589,6 +590,28 @@ $('statSeg').addEventListener('click', (e) => {
   if (statsView.range === b.dataset.range) return;
   statsView.range = b.dataset.range;
   renderStats();
+});
+
+// 「详细」：弹出独立窗口，日历格子大得多，日期一眼能看清
+// 带上当前正在看的那天，详细页直接定位过去
+function detailFocusKey() {
+  const now = new Date();
+  if (statsView.range === 'day') return hKey(now);
+  if (statsView.range === 'week') return hKey(addDays(weekStart(now), -statsView.weekOff * 7));
+  const base = new Date(now.getFullYear(), now.getMonth() - statsView.monthOff, 1);
+  return hKey(base);
+}
+$('btnStatsFull').addEventListener('click', (e) => {
+  e.stopPropagation();
+  api.openStats(detailFocusKey());
+});
+
+// 月视图点某一格 → 直接看那天的明细
+$('statsBody').addEventListener('click', (e) => {
+  const cell = e.target.closest('.st-cell[data-d]');
+  if (!cell) return;
+  e.stopPropagation();
+  api.openStats(cell.dataset.d);
 });
 
 $('btnDismiss').addEventListener('click', (e) => {
@@ -847,8 +870,8 @@ api.onTick((data) => {
   if (hash.includes('wake')) { stage.classList.add('is-away', 'is-wake'); }
   if (hash.includes('update') || hash.includes('ready')) {
     state.update = hash.includes('ready')
-      ? { mode: 'auto', status: 'ready', version: '1.4.0', percent: 100 }
-      : { mode: 'auto', status: 'available', version: '1.4.0', percent: 0 };
+      ? { mode: 'auto', status: 'ready', version: '1.4.1', percent: 100 }
+      : { mode: 'auto', status: 'available', version: '1.4.1', percent: 0 };
     renderUpdate();
   }
 })();
@@ -943,7 +966,7 @@ function createMock() {
       workSec: data.workSec,
       alerted: false,
       history: data.history,
-      version: '1.4.0',
+      version: '1.4.1',
       update: null
     }),
     getStats: async () => data.history,
@@ -958,6 +981,8 @@ function createMock() {
       if (!isTest) recordMock('snooze');
     },
     setIslandRect: () => {},
+    openStats: () => {},
+    minimize: () => {},
     pin: () => {},
     hold: () => {},
     quit: () => {},

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+<title>起身记录</title>
+<link rel="stylesheet" href="stats.css" />
+</head>
+<body>
+  <header class="bar">
+    <div class="brand">
+      <img src="mascot.png" alt="" draggable="false" />
+      <b>起身记录</b>
+      <span class="tag">详细</span>
+    </div>
+    <div class="nav">
+      <button class="nb" id="mPrev" title="上个月">‹</button>
+      <b id="mLabel">—</b>
+      <button class="nb" id="mNext" title="下个月">›</button>
+      <button class="nb today-btn" id="mToday" title="回到本月">今天</button>
+    </div>
+    <div class="wctl">
+      <button id="wMin" title="最小化">–</button>
+      <button id="wClose" class="close" title="关闭">×</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="cal">
+      <div class="kpis" id="kpis"></div>
+      <div class="wd">
+        <span>日</span><span>一</span><span>二</span><span>三</span>
+        <span>四</span><span>五</span><span>六</span>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="foot">
+        <span class="lg">少<i class="hl0"></i><i class="hl1"></i><i class="hl2"></i><i class="hl3"></i><i class="hl4"></i>多</span>
+        <span class="hint">点任意一天看明细 · ← → 换月 · T 回今天</span>
+      </div>
+    </section>
+
+    <aside class="side" id="side"></aside>
+  </main>
+
+  <script src="stats.js"></script>
+</body>
+</html>

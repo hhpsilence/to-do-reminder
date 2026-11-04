@@ -1,0 +1,299 @@
+/* ================= 起身记录 · 详细页 =================
+   和岛共用一套配色（暖米纸 / 赭橙 / 藏青），但这页是独立窗口，
+   尺寸大了不少，所以字号、格子都按"能看清日期"重新排过。 */
+
+:root {
+  --bg: #FDF7EC;
+  --bg-2: #FBF1E2;
+  --fg: #3F3550;
+  --sub: rgba(63, 53, 80, .55);
+  --line: rgba(92, 72, 112, .13);
+  --chip: rgba(92, 72, 112, .07);
+  --accent: #C25A38;
+  --accent-2: #E4835A;
+  --accent-soft: rgba(194, 90, 56, .14);
+  --navy: #2C4C96;
+  --danger: #B5544A;
+  --card: rgba(255, 255, 255, .64);
+  --card-line: rgba(255, 255, 255, .92);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  display: flex; flex-direction: column;
+  background:
+    radial-gradient(1100px 520px at 10% -12%, #FFFBF2 0%, rgba(255, 251, 242, 0) 62%),
+    radial-gradient(900px 460px at 92% 8%, #FDF2E2 0%, rgba(253, 242, 226, 0) 60%),
+    #FAF2E4;
+  color: var(--fg);
+  font-family: "Segoe UI", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ---------- 自绘标题栏 ---------- */
+.bar {
+  position: relative;
+  flex: none; height: 54px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 10px 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(253, 247, 236, .78);
+  -webkit-app-region: drag;
+}
+
+.brand { display: flex; align-items: center; gap: 7px; }
+.brand img { width: 24px; height: 26px; object-fit: contain; -webkit-user-drag: none; }
+.brand b { font-size: 13.5px; font-weight: 650; letter-spacing: .01em; }
+.brand .tag {
+  font-size: 9.5px; font-weight: 600; letter-spacing: .04em;
+  padding: 2px 6px; border-radius: 6px;
+  background: var(--accent-soft); color: var(--accent);
+}
+
+.nav {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 5px;
+  -webkit-app-region: no-drag;
+}
+.nb {
+  height: 26px; min-width: 26px; padding: 0 6px;
+  border: 0; border-radius: 8px; cursor: pointer;
+  font: inherit; font-size: 12px; line-height: 1;
+  background: var(--chip); color: var(--fg);
+  display: grid; place-items: center;
+  transition: background .16s ease, transform .14s ease;
+}
+.nb:hover { background: var(--accent-soft); }
+.nb:active { transform: scale(.95); }
+.nb:disabled { opacity: .28; cursor: default; }
+.nb:disabled:hover { background: var(--chip); }
+#mLabel {
+  min-width: 104px; text-align: center;
+  font-size: 12.5px; font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.today-btn { font-size: 11px; font-weight: 600; padding: 0 9px; color: var(--sub); }
+
+.wctl { margin-left: auto; display: flex; gap: 3px; -webkit-app-region: no-drag; }
+.wctl button {
+  width: 30px; height: 26px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--sub);
+  font: inherit; font-size: 14px; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+  transition: background .15s ease, color .15s ease;
+}
+.wctl button:hover { background: var(--chip); color: var(--fg); }
+.wctl .close:hover { background: rgba(181, 84, 74, .14); color: var(--danger); }
+
+/* ---------- 主体 ---------- */
+.main {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; gap: 16px;
+  padding: 15px 18px 16px;
+}
+
+.cal { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+
+/* 顶部四个数 */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-bottom: 12px; flex: none; }
+.kpi {
+  background: var(--card); border: 1px solid var(--card-line);
+  border-radius: 12px; padding: 8px 12px 9px;
+  box-shadow: 0 1px 2px rgba(110, 78, 58, .05);
+}
+.kpi b {
+  font-size: 19px; font-weight: 700; line-height: 1.15;
+  letter-spacing: -.01em; font-variant-numeric: tabular-nums;
+}
+.kpi b small { font-size: 10.5px; font-weight: 600; color: var(--sub); margin-left: 2px; }
+.kpi span { display: block; font-size: 10px; color: var(--sub); margin-top: 1px; }
+
+/* 星期表头 */
+.wd {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px;
+  margin-bottom: 6px; flex: none;
+}
+.wd span {
+  text-align: center; font-size: 10px; font-weight: 600;
+  letter-spacing: .06em; color: rgba(63, 53, 80, .38);
+}
+
+/* ---------- 日历格子 ---------- */
+.grid {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 1fr; gap: 8px;
+}
+
+.cell {
+  position: relative; min-height: 0; overflow: hidden;
+  border: 1px solid transparent; border-radius: 11px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: transform .14s ease, box-shadow .16s ease;
+}
+.cell.pick { cursor: pointer; }
+.cell.pick:hover { transform: translateY(-1px); box-shadow: 0 7px 16px rgba(110, 78, 58, .16); }
+.cell.pick:active { transform: scale(.985); }
+
+.cell u {
+  position: absolute; top: 6px; left: 8px;
+  font-size: 12.5px; font-weight: 700; text-decoration: none;
+  opacity: .68; letter-spacing: .01em; font-variant-numeric: tabular-nums;
+}
+/* 次数：数字和「次」要并排，别一个上一个下 */
+.cell .cnt { display: flex; align-items: baseline; gap: 2px; }
+.cell b {
+  font-size: 20px; font-weight: 700; line-height: 1.1;
+  font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+}
+.cell i { font-style: normal; font-size: 9.5px; opacity: .7; }
+.cell em {
+  width: 100%; max-width: 100%; margin-top: 4px; padding: 0 4px;
+  text-align: center; font-style: normal; font-size: 8.5px; line-height: 1.25;
+  opacity: .62; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.cell.zero .cnt b { font-size: 15px; font-weight: 600; opacity: .34; }
+
+.cell.void { background: transparent; pointer-events: none; }
+.cell.future {
+  background: rgba(255, 255, 255, .3);
+  border: 1px dashed rgba(92, 72, 112, .17);
+}
+.cell.future u { opacity: .42; font-weight: 600; }
+.cell.future b, .cell.future i, .cell.future em, .cell.future .cnt { display: none; }
+
+/* 今天：内嵌一圈藏青；选中：外面一圈赭橙。两个能同时出现 */
+.cell.today { box-shadow: inset 0 0 0 2px rgba(44, 76, 150, .4); }
+.cell.today u { opacity: 1; color: var(--navy); }
+.cell.sel { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 热力色阶 */
+.hl0 { background: rgba(92, 72, 112, .05); color: rgba(63, 53, 80, .32); }
+.hl1 { background: rgba(194, 90, 56, .14); color: rgba(150, 60, 35, .95); }
+.hl2 { background: rgba(194, 90, 56, .32); color: rgba(120, 45, 25, .96); }
+.hl3 { background: rgba(194, 90, 56, .60); color: #FFF7EF; }
+.hl4 { background: rgba(194, 90, 56, .86); color: #FFF7EF; }
+
+.foot {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  margin-top: 10px; font-size: 10px; color: var(--sub);
+}
+.lg { display: flex; align-items: center; gap: 4px; }
+.lg i { width: 12px; height: 12px; border-radius: 4px; display: block; }
+.hint { margin-left: auto; }
+
+/* ---------- 右侧：某一天 ---------- */
+.side {
+  flex: none; width: 274px;
+  display: flex; flex-direction: column; min-height: 0;
+  background: var(--card); border: 1px solid var(--card-line);
+  border-radius: 16px; padding: 14px 14px 12px;
+  box-shadow: 0 8px 22px rgba(110, 78, 58, .07);
+}
+
+.sd-top { display: flex; align-items: baseline; gap: 6px; flex: none; }
+.sd-top b { font-size: 15px; font-weight: 700; letter-spacing: .01em; }
+.sd-top span { font-size: 10.5px; color: var(--sub); }
+.sd-top .pill {
+  margin-left: auto; font-size: 9px; font-weight: 600;
+  padding: 2px 6px; border-radius: 6px;
+  background: var(--accent-soft); color: var(--accent);
+}
+
+.sd-big { display: flex; align-items: baseline; gap: 4px; margin: 8px 0 1px; flex: none; }
+.sd-big b {
+  font-size: 38px; line-height: 1; font-weight: 700;
+  letter-spacing: -.03em; font-variant-numeric: tabular-nums;
+}
+.sd-big span { font-size: 11px; color: var(--sub); }
+
+.sd-cmp { flex: none; font-size: 10.5px; line-height: 1.5; color: var(--sub); margin-bottom: 10px; }
+.sd-cmp i { font-style: normal; color: var(--accent); font-weight: 650; }
+
+.sd-list {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column; gap: 1px;
+  padding-right: 2px;
+}
+.sd-list::-webkit-scrollbar { width: 4px; }
+.sd-list::-webkit-scrollbar-thumb { background: rgba(120, 90, 60, .18); border-radius: 4px; }
+
+.sd-row { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 9px; flex: none; }
+.sd-row:nth-child(odd) { background: var(--chip); }
+.sd-row .d {
+  width: 6px; height: 6px; border-radius: 50%; flex: none;
+  background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.sd-row b { font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.sd-row .k { margin-left: auto; font-size: 9.5px; color: var(--sub); }
+
+.sd-empty {
+  flex: 1 1 auto; display: grid; place-items: center; text-align: center;
+  font-size: 11px; line-height: 1.9; color: var(--sub);
+}
+
+/* 这一周：7 根小柱 */
+.sd-week { flex: none; margin: 0 0 10px; padding: 9px 0 0; border-top: 1px solid var(--line); }
+.sd-wt { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+.sd-wt b { font-size: 10.5px; font-weight: 650; }
+.sd-wt span { font-size: 9.5px; color: var(--sub); font-variant-numeric: tabular-nums; }
+.sd-wt em { margin-left: auto; font-style: normal; font-size: 9.5px; color: var(--sub); }
+.sd-wbars { display: flex; align-items: flex-end; gap: 5px; height: 52px; }
+.wb {
+  flex: 1 1 0; min-width: 0; height: 100%;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 3px;
+}
+.wb i {
+  width: 100%; max-width: 16px; display: block;
+  border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  opacity: .3;
+}
+.wb.on i { opacity: 1; box-shadow: 0 3px 8px rgba(194, 90, 56, .3); }
+.wb u {
+  font-size: 8.5px; text-decoration: none; color: rgba(63, 53, 80, .4);
+  line-height: 1;
+}
+.wb.on u { color: var(--accent); font-weight: 700; }
+
+/* 当天几点起的：0-24 点一条线 */
+.sd-tl { position: relative; flex: none; height: 52px; margin: 6px 2px 0; }
+.sd-tl .rail {
+  position: absolute; left: 0; right: 0; top: 22px; height: 3px; border-radius: 3px;
+  background: linear-gradient(90deg, rgba(194, 90, 56, .10), rgba(194, 90, 56, .26));
+}
+.sd-tl .pin {
+  position: absolute; top: 16px; width: 11px; height: 11px; border-radius: 50%;
+  background: var(--accent); border: 2px solid #FFFDF8;
+  box-shadow: 0 2px 6px rgba(194, 90, 56, .35);
+  transform: translateX(-50%);
+}
+.sd-tl .ax {
+  position: absolute; top: 33px; left: 0; right: 0;
+  display: flex; justify-content: space-between;
+  font-size: 8.5px; color: rgba(63, 53, 80, .34);
+  font-variant-numeric: tabular-nums;
+}
+
+.sd-kpi { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+.sd-kpi div { background: var(--chip); border-radius: 10px; padding: 7px 9px 8px; }
+.sd-kpi b { display: block; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.sd-kpi span { font-size: 9px; color: var(--sub); }
+
+/* 直接用浏览器打开（没有 Electron 外壳）时：不显示窗口按钮，标题栏也不再拖拽 */
+.noapi .wctl { display: none; }
+.noapi .bar { -webkit-app-region: no-drag; }
+.noapi .nav { position: static; transform: none; margin-left: auto; }
+
+/* 窗口窄一点时，右栏收窄，日历优先 */
+@media (max-width: 860px) {
+  .side { width: 236px; }
+  .kpis { grid-template-columns: repeat(4, 1fr); }
+}

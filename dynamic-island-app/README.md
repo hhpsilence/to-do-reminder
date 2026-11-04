@@ -110,6 +110,19 @@ Windows 顶部居中的小胶囊：记待办、看清单、连续工作到点提
 
 数据落在 `history.json`，形如 `{ days: { "2026-11-03": { done: 3, snooze: 1, times: ["09:12","10:05","11:20"] } } }`。主进程负责写，写完 `webContents.send('stats', history)` 推给渲染层，所以统计页开着时数据是活的。
 
+### 详细页（独立窗口）
+
+岛里那一格只有 40px，日期数字必然看不清。所以统计页标题右边有个「详细」，月视图里点任意一格也会弹出详细页——一个 1000×760 的独立窗口，日历一格 89×106，日期 12.5px、次数 20px，还带当天前两次的钟点：
+
+- 顶上一排：本月合计 / 日均 / 没有记录的天数 / 最长连续
+- 大日历：5～6 行整月，今天藏青内描边，选中的一天赭橙外描边，未来的日子只留虚线和淡淡日期
+- 右栏：选中那天的次数、和前一天比、每一次的钟点与间隔、这一周的 7 根小柱、0–24 点时间轴、平均间隔与当前连续
+- `←` `→` 换月，`T` 回今天，`‹ ›` 和「今天」按钮等价
+
+窗口是自绘标题栏（`frame: false`），拖动靠 CSS `-webkit-app-region: drag`；最小化/关闭走 `win:minimize` IPC 和 `window.close()`。已经开着时再点「详细」不会开第二个，只会 restore + 跳到指定那天。
+
+从岛上带过去的那天走 `stats:open` 的第二个参数；窗口已存在则用 `stats:focusDay` 推送，新开则走 `#d=YYYY-MM-DD`。
+
 ## 数据存在哪
 
 - 待办：`%APPDATA%\desk-island\todos.json`
@@ -198,6 +211,7 @@ set ISLAND_SHOT=C:\temp && npx electron .
 | `ISLAND_ALERTTEST=1` | 把专注时长压到 1 分钟等提醒自己弹出，逐 50ms 记 `presence` 和上报的岛矩形，用来验证提醒刚弹出时按钮是不是立刻可点 |
 | `ISLAND_STATSTEST=1` | 只跑主进程：记两笔 done + 一笔 snooze、读回文件、塞 450 天验证裁剪到 400，打印后退出（不建窗口） |
 | `ISLAND_STATSOPEN=C:\temp` | 起真窗口，打开统计页把日/周/月各截一张，顺带打印渲染层的记录条数和溢出像素 |
+| `ISLAND_DETAILSHOT=C:\temp` | 从岛上真点一次「详细」，把详细页的整月 / 点某天 / 上一月各截一张，并打印格子尺寸与溢出 |
 
 页面本身支持用 hash 预览各种状态，浏览器直接打开 `src/index.html` 也能看（走内置 mock 数据）：
 
@@ -211,6 +225,9 @@ preload.js         暴露给页面的安全接口
 src/index.html     胶囊结构（细线 / 收起 / 提醒 / 展开 / 设置）
 src/style.css      暖米纸主题 + 顶部细线
 src/renderer.js    交互逻辑 + 浏览器预览用的 mock 接口
+src/stats.html     起身记录详细页（独立窗口）
+src/stats.css      详细页样式（同一套配色，按大窗口重排）
+src/stats.js       详细页逻辑：整月日历、选中那天的明细、周柱、时间轴
 build/icon.png     应用图标（1024x1024，由 tools/make-icon.py 生成）
 tools/make-icon.py 图标生成脚本（纯 Python 画图，无需 Pillow）
 ```
